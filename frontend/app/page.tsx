@@ -5,7 +5,7 @@ import { Typography, Row, Col, Button, Input } from 'antd';
 import { RocketOutlined, ArrowRightOutlined, RobotOutlined } from '@ant-design/icons';
 import Link from 'next/link';
 import { useTheme } from '@/components/ThemeContext';
-import DotGrid from '@/components/DotGrid';
+import DotTextType from '@/components/DotTextType';
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -14,16 +14,6 @@ export default function Home() {
 
   return (
     <div style={{ padding: '0 24px', overflow: 'hidden', position: 'relative', minHeight: '100vh' }}>
-      {/* DotGrid Background */}
-      <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', zIndex: 0, pointerEvents: 'none' }}>
-        <DotGrid
-          baseColor={isDarkMode ? '#333' : '#e0e7ff'}
-          activeColor={isDarkMode ? '#44449b' : '#5227FF'}
-          dotSize={4}
-          gap={24}
-          shockRadius={100}
-        />
-      </div>
 
       {/* Hero Section */}
       <div className="hero-container" style={{
@@ -35,8 +25,6 @@ export default function Home() {
         zIndex: 1
       }}>
 
-
-
         <Title
           level={1}
           className="hero-title"
@@ -47,7 +35,32 @@ export default function Home() {
             marginBottom: '24px',
           }}
         >
-          Global logistics, <span style={{ color: isDarkMode ? '#ffffff' : '#343471ff' }}>simplified.</span>
+          Global logistics, <br className="block md:hidden" /><DotTextType
+            as="span"
+            text={[
+              "simplified.",
+              "optimized.",
+              "streamlined.",
+              "reliable.",
+              "transparent.",
+              "efficient."
+            ]}
+            textColors={[
+              '#5227FF',
+              '#FF4D4F',
+              '#52C41A',
+              '#FAAD14',
+              '#13C2C2',
+              '#722ED1'
+            ]}
+            typingSpeed={100}
+            deletingSpeed={50}
+            pauseDuration={2000}
+            loop={true}
+            showCursor={true}
+            cursorCharacter="●"
+            className="inline-block"
+          />
         </Title>
 
         <Paragraph style={{ fontSize: '20px', maxWidth: '750px', margin: '0 auto 48px' }}>
@@ -68,9 +81,6 @@ export default function Home() {
           </Link>
         </div>
 
-        <div style={{ marginTop: '16px' }}>
-          <Text type="secondary" style={{ fontSize: '13px' }}>Trusted by top global carriers</Text>
-        </div>
 
       </div>
 
@@ -142,6 +152,6 @@ export default function Home() {
         </div>
       </div>
 
-    </div>
+    </div >
   );
 }

@@ -23,7 +23,7 @@ export default function LoginPage() {
         }}>
             <div style={{ width: '100%', maxWidth: '440px' }}>
 
-               
+
 
                 <Card
                     variant="borderless"
@@ -82,7 +82,7 @@ export default function LoginPage() {
                     <div style={{ textAlign: 'center', marginTop: '18px', display: 'flex', flexDirection: 'column', gap: '12px', justifyContent: 'space-between' }}>
                         <Link href="#" style={{ fontSize: '13px', color: '#44449b' }}>Forgot your password?</Link>
                         <Text type="secondary">Don't have an account? </Text>
-                        <Link href="#" style={{ color: '#44449b', fontWeight: 600 }}>Sign up</Link>
+                        <Link href="/signup" style={{ color: '#44449b', fontWeight: 600 }}>Sign up</Link>
                     </div>
                 </Card>
 

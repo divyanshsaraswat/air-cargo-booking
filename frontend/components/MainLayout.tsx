@@ -1,12 +1,14 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Layout, Button, Typography, Space, Drawer } from 'antd';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useTheme } from './ThemeContext';
 import ThemeToggle from './ThemeToggle';
+import DotGrid from '@/components/DotGrid';
 import { MenuOutlined, CloseOutlined } from '@ant-design/icons';
+import gsap from 'gsap';
 
 const { Header, Content, Footer } = Layout;
 const { Text } = Typography;
@@ -20,57 +22,183 @@ export default function MainLayout({
     const { isDarkMode } = useTheme();
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
+    // Animation Refs
+    const headerRef = useRef<HTMLElement>(null);
+    const navRef = useRef<HTMLDivElement>(null);
+    const ctaRef = useRef<HTMLDivElement>(null);
+    const logoRef = useRef<HTMLDivElement>(null);
+    const logoTextRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const mm = gsap.matchMedia();
+
+        mm.add("(min-width: 1024px)", () => {
+            // Initial states
+            // Navbar starts as a pill containing just the logo + text (centered)
+            gsap.set(headerRef.current, {
+                width: '230px', // Wider initial width to fit "Air Cargo"
+                height: '56px',
+                borderRadius: '50px',
+                padding: '0 10px',
+                justifyContent: 'space-between',
+                force3D: true
+            });
+
+            // Hide Nav and CTA initially using absolute positioning
+            // This removes them from flow, allowing Logo to be centered by flexbox/margins
+            // and allows us to "just animate opacity" as requested.
+            gsap.set([navRef.current, ctaRef.current], {
+                autoAlpha: 0,
+                position: 'absolute',
+                top: '50%',
+                yPercent: -50,
+                padding: 0,
+                margin: 0
+            });
+
+            // Center Nav
+            gsap.set(navRef.current, {
+                left: '50%',
+                xPercent: -50
+            });
+
+            // Position CTA to right
+            gsap.set(ctaRef.current, {
+                right: '32px'
+            });
+
+            // Ensure Logo + Text is centered initially using auto margins
+            gsap.set(logoRef.current, {
+                margin: '0 auto',
+                x: 0
+            });
+
+            // Ensure Logo Text is visible
+            gsap.set(logoTextRef.current, {
+                autoAlpha: 1,
+                display: 'block'
+            });
+
+            // Spring Configuration (User Configurable)
+            const springAmplitude = 3;
+            const springPeriod = 0.4;
+
+            // Animation Timeline
+            const tl = gsap.timeline({ defaults: { ease: 'power3.out' } });
+
+            // 1. Wait a bit
+            tl.to({}, { duration: 1 })
+
+                // 2. Expand width with springy motion
+                .to(headerRef.current, {
+                    width: 'calc(100% - 48px)',
+                    maxWidth: '1200px',
+                    padding: '0 32px',
+                    duration: 1.8,
+                    ease: `elastic.out(1,0.3)`,
+                }, 'expand')
+
+                // Move logo to left (margin 0)
+                .to(logoRef.current, {
+                    marginLeft: 0,
+                    marginRight: 0,
+                    duration: 1.5,
+                    ease: 'power4.inOut'
+                }, 'expand')
+
+                // 3. Reveal Nav & CTA (Just Opacity)
+                .to([navRef.current, ctaRef.current], {
+                    autoAlpha: 1,
+                    duration: 1,
+                    stagger: 0.1,
+                    delay: 0.2 // Start fading in slightly after expansion begins
+                }, 'expand+=0.3'); // Start slightly later
+
+        });
+
+        return () => mm.revert();
+    }, []);
+
     return (
-        <Layout style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+        <Layout style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: isDarkMode ? '#121212' : '#ffffff' }}>
+            {/* DotGrid Background */}
+            {/* DotGrid Background - Only on Home Page */}
+            {pathname === '/' && (
+                <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', zIndex: 0, pointerEvents: 'none' }}>
+                    <DotGrid
+                        baseColor={isDarkMode ? '#333' : '#e0e7ff'}
+                        activeColor={isDarkMode ? '#44449b' : '#5227FF'}
+                        dotSize={4}
+                        gap={24}
+                        shockRadius={100}
+                    />
+                </div>
+            )}
+
             <Header
-                className="responsive-header"
+                ref={headerRef}
                 style={{
-                    position: 'sticky',
-                    top: 0,
-                    zIndex: 1,
-                    width: '100%',
+                    position: 'fixed',
+                    top: '24px',
+                    zIndex: 9999,
+                    // Initial styles will be overridden by GSAP, keeping defaults for SSR/no-js
+                    width: 'calc(100% - 48px)',
+                    maxWidth: '1200px',
+                    left: '50%',
+                    transform: 'translateX(-50%)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
-                    // padding handled by CSS
-                    height: 'auto', // Allow growing
-                    minHeight: '80px',
-                    boxShadow: isDarkMode ? '0 2px 8px rgba(0,0,0,0.5)' : '0 2px 8px rgba(0,0,0,0.05)',
-                    background: isDarkMode ? '#1f1f1f' : '#ffffff',
+                    padding: '0 32px',
+                    height: 'auto',
+                    minHeight: '72px',
+                    borderRadius: '50px',
+                    border: isDarkMode ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(0,0,0,0.04)',
+                    boxShadow: isDarkMode ? '0 8px 32px rgba(0,0,0,0.2)' : '0 8px 32px rgba(0,0,0,0.05)',
+                    background: isDarkMode ? 'rgba(31, 31, 31, 0.65)' : 'rgba(255, 255, 255, 0.65)',
+                    backdropFilter: 'blur(16px)',
+                    WebkitBackdropFilter: 'blur(16px)',
+                    overflow: 'hidden', // Hide overflow during expansion
                 }}
             >
                 {/* Logo Area */}
                 <Link href="/" style={{ textDecoration: 'none' }} passHref>
-                    <div className="logo" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <div style={{ width: '32px', height: '32px', background: '#44449b', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 'bold' }}>AC</div>
-                        <Text strong className="logo-text" style={{ fontSize: '24px', fontFamily: 'sans-serif', color: isDarkMode ? 'white' : 'inherit' }}>
-                            Air Cargo
-                        </Text>
+                    <div ref={logoRef} className="logo" style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: '12px' }}>
+                        <div style={{ width: '32px', height: '32px', background: '#44449b', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 'bold', flexShrink: 0 }}>AC</div>
+                        <div ref={logoTextRef}>
+                            <Text strong className="logo-text" style={{ fontSize: '24px', fontFamily: 'sans-serif', color: isDarkMode ? 'white' : 'inherit', whiteSpace: 'nowrap' }}>
+                                Air Cargo
+                            </Text>
+                        </div>
                     </div>
                 </Link>
 
                 {/* Navigation - Minimalist Text Links (Desktop) */}
-                <Space size={40} className="responsive-nav" style={{ display: 'flex' }}>
-                    <Link href="/" passHref>
-                        <Text strong={pathname === '/'} style={{ color: isDarkMode ? 'white' : undefined }}>Home</Text>
-                    </Link>
-                    <Link href="/booking" passHref>
-                        <Text strong={pathname === '/booking'} style={{ color: isDarkMode ? 'white' : undefined }}>Booking</Text>
-                    </Link>
-                    <Link href="/tracking" passHref>
-                        <Text strong={pathname === '/tracking'} style={{ color: isDarkMode ? 'white' : undefined }}>Track</Text>
-                    </Link>
-                </Space>
+                <div ref={navRef}>
+                    <Space size={40} className="responsive-nav" style={{ display: 'flex' }}>
+                        <Link href="/" passHref>
+                            <Text strong={pathname === '/'} style={{ color: isDarkMode ? 'white' : undefined }}>Home</Text>
+                        </Link>
+                        <Link href="/booking" passHref>
+                            <Text strong={pathname === '/booking'} style={{ color: isDarkMode ? 'white' : undefined }}>Booking</Text>
+                        </Link>
+                        <Link href="/tracking" passHref>
+                            <Text strong={pathname === '/tracking'} style={{ color: isDarkMode ? 'white' : undefined }}>Track</Text>
+                        </Link>
+                    </Space>
+                </div>
 
                 {/* Desktop CTA & Toggle */}
-                <Space size={16} className="desktop-cta">
-                    {/* <ThemeToggle /> */}
-                    <Link href="/login">
-                        <Button type="primary" size="large">
-                            Get Started
-                        </Button>
-                    </Link>
-                </Space>
+                <div ref={ctaRef}>
+                    <Space size={16} className="desktop-cta">
+                        {/* <ThemeToggle /> */}
+                        <Link href="/login">
+                            <Button type="primary" size="middle" shape="round">
+                                Get Started
+                            </Button>
+                        </Link>
+                    </Space>
+                </div>
 
                 {/* Mobile Hamburger Icon */}
                 <div className="mobile-menu-icon" onClick={() => setMobileMenuOpen(true)}>
@@ -79,11 +207,14 @@ export default function MainLayout({
 
                 {/* Mobile Menu Drawer */}
                 <Drawer
+                    // ... drawer props
                     title="Menu"
                     placement="right"
                     onClose={() => setMobileMenuOpen(false)}
+                    // ...
                     open={mobileMenuOpen}
                     width={'100%'}
+                    zIndex={10000}
                     closeIcon={<CloseOutlined style={{ color: isDarkMode ? 'white' : 'inherit' }} />}
                     styles={{
                         header: {
@@ -100,21 +231,18 @@ export default function MainLayout({
                         }
                     }}
                 >
-                    <Link href="/" onClick={() => setMobileMenuOpen(false)} style={{ fontSize: '24px', fontWeight: 600, color: isDarkMode ? 'white' : '#0e0b38' }}>
+                    {/* ... Drawer Content ... */}
+                    <Link href="/" onClick={() => setMobileMenuOpen(false)} style={{ fontSize: '24px', fontWeight: 600, color: isDarkMode ? 'white' : '#0e0b38', textAlign: 'center' }}>
                         Home
                     </Link>
-                    <Link href="/booking" onClick={() => setMobileMenuOpen(false)} style={{ fontSize: '24px', fontWeight: 600, color: isDarkMode ? 'white' : '#0e0b38' }}>
+                    <Link href="/booking" onClick={() => setMobileMenuOpen(false)} style={{ fontSize: '24px', fontWeight: 600, color: isDarkMode ? 'white' : '#0e0b38', textAlign: 'center' }}>
                         Booking
                     </Link>
-                    <Link href="/tracking" onClick={() => setMobileMenuOpen(false)} style={{ fontSize: '24px', fontWeight: 600, color: isDarkMode ? 'white' : '#0e0b38' }}>
+                    <Link href="/tracking" onClick={() => setMobileMenuOpen(false)} style={{ fontSize: '24px', fontWeight: 600, color: isDarkMode ? 'white' : '#0e0b38', textAlign: 'center' }}>
                         Track
                     </Link>
 
                     <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: '24px' }}>
-                        {/* <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                            <Text style={{ fontSize: '18px', color: isDarkMode ? 'white' : '#0e0b38' }}>Dark Mode</Text>
-                            <ThemeToggle />
-                        </div> */}
                         <Link href="/login" onClick={() => setMobileMenuOpen(false)}>
                             <Button type="primary" size="large" block style={{ height: '56px', fontSize: '18px' }}>
                                 Get Started
@@ -124,7 +252,7 @@ export default function MainLayout({
                 </Drawer>
             </Header>
 
-            <Content style={{ background: isDarkMode ? '#121212' : '#fff' }}>
+            <Content style={{ background: 'transparent', paddingTop: '120px' }}>
                 {children}
             </Content>
 
