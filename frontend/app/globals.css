@@ -24,3 +24,87 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+@media (max-width: 768px) {
+  .responsive-header {
+    padding: 0 16px !important;
+    height: auto !important;
+    flex-wrap: wrap;
+    gap: 16px;
+    padding-bottom: 16px !important;
+  }
+
+  .responsive-nav {
+    display: none !important;
+    /* For now, hide nav text links on mobile to save space, or use a mobile menu */
+    /* Alternatively, keep them but smaller */
+    /* display: flex; gap: 16px !important; width: 100%; justify-content: center; */
+  }
+
+  .hero-title {
+    font-size: 36px !important;
+  }
+
+  .hero-container {
+    padding: 40px 16px !important;
+  }
+
+  .responsive-stack {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .hero-buttons {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .hero-buttons>a,
+  .hero-buttons button {
+    width: 100%;
+  }
+
+  /* Logo adjustment */
+  .logo-text {
+    font-size: 20px !important;
+  }
+
+  .mobile-menu-icon {
+    display: block !important;
+    cursor: pointer;
+    font-size: 24px;
+    /* color inherited or set explicitly if needed */
+  }
+
+  /* Hide CTA on mobile header if we move it to menu, or keep it? User said "get started button too". 
+     So seemingly move it to menu or duplicate? 
+     Usually duplications or hiding desktop one.
+     Let's hide the desktop CTA container on mobile.
+     The desktop CTA is in a Space.
+  */
+  .desktop-cta {
+    display: none !important;
+  }
+}
+
+@media (min-width: 769px) {
+  .responsive-header {
+    padding: 0 40px !important;
+  }
+
+  .hero-title {
+    font-size: 64px !important;
+  }
+
+  .hero-container {
+    padding: 100px 20px 60px !important;
+  }
+
+  .mobile-menu-icon {
+    display: none !important;
+  }
+
+  .desktop-cta {
+    display: flex !important;
+  }
+}
