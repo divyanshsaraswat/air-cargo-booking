@@ -5,6 +5,7 @@ import { Typography, Row, Col, Button, Input } from 'antd';
 import { RocketOutlined, ArrowRightOutlined, RobotOutlined } from '@ant-design/icons';
 import Link from 'next/link';
 import { useTheme } from '@/components/ThemeContext';
+import DotGrid from '@/components/DotGrid';
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -12,7 +13,17 @@ export default function Home() {
   const { isDarkMode } = useTheme();
 
   return (
-    <div style={{ padding: '0 24px', overflow: 'hidden' }}>
+    <div style={{ padding: '0 24px', overflow: 'hidden', position: 'relative', minHeight: '100vh' }}>
+      {/* DotGrid Background */}
+      <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', zIndex: 0, pointerEvents: 'none' }}>
+        <DotGrid
+          baseColor={isDarkMode ? '#333' : '#e0e7ff'}
+          activeColor={isDarkMode ? '#44449b' : '#5227FF'}
+          dotSize={4}
+          gap={24}
+          shockRadius={100}
+        />
+      </div>
 
       {/* Hero Section */}
       <div className="hero-container" style={{
@@ -20,30 +31,10 @@ export default function Home() {
         // padding handled by CSS
         maxWidth: '1200px',
         margin: '0 auto',
-        position: 'relative'
+        position: 'relative',
+        zIndex: 1
       }}>
 
-        {/* ... Background Elements (unchanged) ... */}
-        {/* Background Elements */}
-        <div style={{
-          position: 'absolute',
-          top: '20%',
-          left: '10%',
-          width: '20px',
-          height: '20px',
-          background: '#e0e7ff', // Light Indigo/Blue
-          transform: 'rotate(45deg)',
-          zIndex: -1
-        }} />
-        <div style={{
-          position: 'absolute',
-          top: '30%',
-          right: '15%',
-          width: '30px',
-          height: '30px',
-          background: '#e8eaf6',
-          zIndex: -1
-        }} />
 
 
         <Title
