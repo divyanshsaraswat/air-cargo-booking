@@ -23,7 +23,7 @@ function TrackingContent() {
         }
     }, [searchParams]);
 
-    const handleSearch = (id?: string) => {
+    const handleSearch = async (id?: string) => {
         const queryId = id || searchId;
         if (!queryId) return;
 
@@ -31,27 +31,45 @@ function TrackingContent() {
         setError('');
         setTrackingData(null);
 
-        // Mock API call
-        setTimeout(() => {
-            setLoading(false);
-            // Simulate finding data for specific ID, else error or random success
-            if (queryId.toLowerCase() === 'error') {
-                setError('Booking ID not found. Please check and try again.');
-            } else {
-                setTrackingData({
-                    id: queryId,
-                    origin: 'New York (JFK)',
-                    destination: 'London (LHR)',
-                    pieces: 5,
-                    weight: 450,
-                    currentStatus: 'DEPARTED', // Randomly pick or static
-                    events: [
-                        { status: 'BOOKED', location: 'JFK', timestamp: '2023-10-25 10:00', description: 'Booking created at JFK' },
-                        { status: 'DEPARTED', location: 'JFK', timestamp: '2023-10-26 14:30', description: 'Flight BA112 departed' },
-                    ]
-                });
+        try {
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/bookings/${queryId}`);
+
+            if (!res.ok) {
+                if (res.status === 404) {
+                    throw new Error('Booking ID not found. Please check and try again.');
+                } else {
+                    throw new Error('Failed to fetch booking details.');
+                }
             }
-        }, 1000);
+
+            const data = await res.json();
+
+            // Transform backend data to frontend structure
+            const mappedData = {
+                id: data.ref_id,
+                origin: data.origin,
+                destination: data.destination,
+                pieces: data.pieces,
+                weight: data.weight_kg,
+                currentStatus: data.status,
+                events: (data.events || []).map((e: any) => ({
+                    status: e.status,
+                    location: e.location || 'Unknown',
+                    timestamp: new Date(e.timestamp).toLocaleString('en-IN', {
+                        timeZone: 'Asia/Kolkata',
+                        dateStyle: 'medium',
+                        timeStyle: 'short'
+                    }) + ' (IST)',
+                    description: e.metadata?.message || `Status updated to ${e.status}`
+                }))
+            };
+
+            setTrackingData(mappedData);
+        } catch (err: any) {
+            setError(err.message || "An error occurred");
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (
@@ -130,7 +148,7 @@ function TrackingContent() {
 
 export default function TrackingPage() {
     return (
-        <Suspense fallback={<div>Loading...</div>}>
+        <Suspense>
             <TrackingContent />
         </Suspense>
     );

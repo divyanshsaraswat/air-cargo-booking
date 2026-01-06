@@ -39,27 +39,27 @@ export default function TrackingTimeline({ events, currentStatus }: TrackingTime
                 direction="vertical"
                 current={currentStep}
                 items={[
-                    {
-                        title: 'Booked',
-                        description: events.find(e => e.status === 'BOOKED')?.description || 'Shipment details received',
-                        icon: <ClockCircleOutlined />,
-                    },
-                    {
-                        title: 'Departed',
-                        description: events.find(e => e.status === 'DEPARTED')?.description || 'In transit',
-                        icon: <EnvironmentOutlined />,
-                    },
-                    {
-                        title: 'Arrived',
-                        description: events.find(e => e.status === 'ARRIVED')?.description || 'Arrived at destination airport',
-                        icon: <EnvironmentOutlined />,
-                    },
-                    {
-                        title: 'Delivered',
-                        description: events.find(e => e.status === 'DELIVERED')?.description || 'Delivered to consignee',
-                        icon: <CheckCircleOutlined />,
-                    },
-                ]}
+                    { title: 'Booked', status: 'BOOKED', icon: <ClockCircleOutlined /> },
+                    { title: 'Departed', status: 'DEPARTED', icon: <EnvironmentOutlined /> },
+                    { title: 'Arrived', status: 'ARRIVED', icon: <EnvironmentOutlined /> },
+                    { title: 'Delivered', status: 'DELIVERED', icon: <CheckCircleOutlined /> },
+                ].map(step => {
+                    const event = events.find(e => e.status === step.status);
+                    return {
+                        title: step.title,
+                        icon: step.icon,
+                        description: (
+                            <div>
+                                <div>{event?.description || 'Pending'}</div>
+                                {event?.timestamp && (
+                                    <Text type="secondary" style={{ fontSize: '12px' }}>
+                                        {event.timestamp}
+                                    </Text>
+                                )}
+                            </div>
+                        )
+                    };
+                })}
             />
         </Card>
     );
