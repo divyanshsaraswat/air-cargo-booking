@@ -1,13 +1,24 @@
-from fastapi import FastAPI, HTTPException, status
+from fastapi import FastAPI, HTTPException, status, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import OAuth2PasswordBearer
 from pydantic import BaseModel, Field
 from typing import List, Optional
-from datetime import datetime, date
+from datetime import datetime, date, timedelta, timezone
 from uuid import uuid4
 from enum import Enum
 from db.db import supabase
+from jose import JWTError, jwt
+import os
 
 app = FastAPI()
+
+# --- Security Config ---
+# In production, these should be env vars
+SECRET_KEY = os.getenv("SECRET_KEY", "your-super-secret-key-change-this")
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 # 24 hours
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="users/login")
 
 app.add_middleware(
     CORSMiddleware,
@@ -25,6 +36,11 @@ class BookingStatus(str, Enum):
     DELIVERED = "DELIVERED"
     CANCELLED = "CANCELLED"
 
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+    user: dict
+
 # --- Pydantic Models ---
 
 # Flight Models
@@ -36,10 +52,14 @@ class Flight(BaseModel):
     arrival_datetime: datetime
     origin: str
     destination: str
+    max_weight_kg: int = 5000
+    booked_weight_kg: int = 0
+    base_price_per_kg: float = 5.00
 
 # Booking Models
 class BookingCreate(BaseModel):
     ref_id: str = Field(..., description="Human-friendly unique ID")
+    user_id: Optional[str] = Field(None, description="ID of the user creating the booking")
     origin: str
     destination: str
     pieces: int
@@ -52,12 +72,14 @@ class BookingEvent(BaseModel):
     booking_ref_id: str
     status: BookingStatus
     location: Optional[str] = None
+    calendar: Optional[str] = None
     flight_id: Optional[str] = None
-    timestamp: datetime = Field(default_factory=datetime.now)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     metadata: Optional[dict] = {}
 
 class BookingDataset(BaseModel):
     ref_id: str
+    user_id: Optional[str] = None
     origin: str
     destination: str
     pieces: int
@@ -68,6 +90,138 @@ class BookingDataset(BaseModel):
     updated_at: datetime
     # We will likely fetch events separately or nest them if needed
     events: Optional[List[BookingEvent]] = None
+
+# --- User Management & Auth Utils ---
+
+import bcrypt
+
+class UserCreate(BaseModel):
+    email: str = Field(..., description="User email")
+    password: str = Field(..., description="User password")
+    name: str = Field(..., description="User full name")
+    dob: Optional[date] = None
+
+class UserLogin(BaseModel):
+    email: str
+    password: str
+
+class UserResponse(BaseModel):
+    id: str
+    email: str
+    name: str
+    dob: Optional[date]
+    created_at: datetime
+
+def get_password_hash(password: str) -> str:
+    # bcrypt requires bytes
+    pwd_bytes = password.encode('utf-8')
+    salt = bcrypt.gensalt()
+    return bcrypt.hashpw(pwd_bytes, salt).decode('utf-8')
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    pwd_bytes = plain_password.encode('utf-8')
+    hash_bytes = hashed_password.encode('utf-8')
+    return bcrypt.checkpw(pwd_bytes, hash_bytes)
+
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
+    to_encode = data.copy()
+    if expires_delta:
+        expire = datetime.now(timezone.utc) + expires_delta
+    else:
+        expire = datetime.now(timezone.utc) + timedelta(minutes=15)
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
+
+async def get_current_user(token: str = Depends(oauth2_scheme)):
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        email: str = payload.get("sub")
+        if email is None:
+            raise credentials_exception
+    except JWTError:
+        raise credentials_exception
+        
+    res = supabase.table("users").select("*").eq("email", email).execute()
+    if not res.data:
+        raise credentials_exception
+    return res.data[0] # Returns dict
+
+@app.post("/users/signup", response_model=Token)
+def signup(user: UserCreate):
+    # Check if email exists
+    res = supabase.table("users").select("id").eq("email", user.email).execute()
+    if res.data:
+        raise HTTPException(status_code=400, detail="Email already registered")
+
+    # Hash password
+    hashed_pwd = get_password_hash(user.password)
+    
+    user_data = {
+        "email": user.email,
+        "password": hashed_pwd,
+        "name": user.name,
+        "dob": user.dob.isoformat() if user.dob else None,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    try:
+        res_insert = supabase.table("users").insert(user_data).execute()
+        if not res_insert.data:
+             raise HTTPException(status_code=500, detail="Failed to create user")
+             
+        created_user = res_insert.data[0]
+        
+        # Create Token
+        access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        access_token = create_access_token(
+            data={"sub": created_user["email"], "id": created_user["id"]},
+            expires_delta=access_token_expires
+        )
+        
+        return {
+            "access_token": access_token, 
+            "token_type": "bearer",
+            "user": created_user
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.post("/users/login", response_model=Token)
+def login(user: UserLogin):
+    # Fetch user by email
+    res = supabase.table("users").select("*").eq("email", user.email).execute()
+    if not res.data:
+        raise HTTPException(status_code=400, detail="Invalid email or password")
+    
+    db_user = res.data[0]
+    
+    # Verify password
+    if not verify_password(user.password, db_user["password"]):
+        raise HTTPException(status_code=400, detail="Invalid email or password")
+    
+    # Create Token
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": db_user["email"], "id": db_user["id"]},
+        expires_delta=access_token_expires
+    )
+        
+    return {
+        "access_token": access_token, 
+        "token_type": "bearer",
+        "user": {
+            "id": db_user["id"],
+            "email": db_user["email"],
+            "name": db_user["name"]
+        }
+    }
 
 @app.get("/route", response_model=List[List[Flight]])
 def get_route(origin: str, destination: str, date: date):
@@ -112,7 +266,7 @@ def get_route(origin: str, destination: str, date: date):
 
     # For each first leg, find connecting second legs: First.dest -> Final Dest
     # Constraint: 2nd leg departure usually after 1st leg arrival. 
-    # And "same day or next day".
+    # And "same day or next day" relative to the start date.
     
     for l1 in res_first.data:
         first_leg = Flight(**l1)
@@ -123,29 +277,21 @@ def get_route(origin: str, destination: str, date: date):
         intermediate = first_leg.destination
         arrival_dt = first_leg.arrival_datetime
         
-        # Next day end constraint. 
-        # "same day or next day" relative to what? usually the arrival of first flight or just calendar date?
-        # The example "DEL-HYD (15th) + HYD-BLR (16th)" implies calendar dates.
-        # But logically, you can't depart before you arrive. 
-        # So: 2nd Dep >= 1st Arr.
-        # And: 2nd Dep Date <= 1st Arr Date + 1 day. (Or 1st Dep Date + 1? Usually 1st Arr)
-        # Let's use: 2nd Dep >= 1st Arr
-        # And 2nd Dep < 1st Arr + 48 hours (generous) or strictly "next calendar day end".
-        # Let's implement: 2nd Dep >= 1st Arr AND 2nd Dep Date <= (1st Arr Date + 1 day)
-        
-        limit_date = arrival_dt.date()
-        # limit_datetime = datetime.combine(limit_date + timedelta(days=1), datetime.max.time()) 
-        # Actually logic says "cannot be after 16th aug". So strictly <= next day end.
+        # Next day end constraint relative to DEPARTURE date (start date).
+        # "same day or next day". 
+        # Example: Start 15th. 2nd leg cannot be after 16th.
         
         # We need a range for 2nd leg departure
         min_dep_2nd = arrival_dt
-        # max_dep_2nd = arrival_dt + timedelta(hours=36) # Approx?
-        # Let's stick to strict calendar days. 
-        # Max departure is End of Next Day relative to First Leg Arrival.
-        import datetime as dt_module
-        from datetime import timedelta
         
-        max_dep_2nd = datetime.combine(arrival_dt.date() + timedelta(days=1), datetime.max.time())
+        # Max departure is End of Next Day relative to First Leg DEPARTURE
+        
+        dep_date = first_leg.departure_datetime.date()
+        max_dep_2nd = datetime.combine(dep_date + timedelta(days=1), datetime.max.time())
+
+        # If arrival is already after the max window (e.g. very long flight), no connection possible
+        if min_dep_2nd > max_dep_2nd:
+            continue
 
         res_second = supabase.table("flights").select("*")\
             .eq("origin", intermediate)\
@@ -167,36 +313,71 @@ def read_root():
 # --- Booking Routes ---
 
 @app.post("/bookings", response_model=BookingDataset)
-def create_booking(booking: BookingCreate):
-    # Check uniqueness of ref_id is handled by DB constraint usually, but we can check here to be safe or catch error
-    
-    # Insert Booking
+def create_booking(booking: BookingCreate, current_user: dict = Depends(get_current_user)):
+    """
+    Create a new booking.
+    Secure endpoint: requires valid JWT token.
+    Ensures user_id matches the authenticated user.
+    """
+    # Enforce user_id from the authenticated token
     booking_data = booking.model_dump()
+    booking_data["user_id"] = current_user["id"]
+    booking_data["created_at"] = datetime.now(timezone.utc).isoformat()
+    booking_data["updated_at"] = datetime.now(timezone.utc).isoformat()
     booking_data["status"] = BookingStatus.BOOKED
-    booking_data["created_at"] = datetime.now().isoformat()
-    booking_data["updated_at"] = datetime.now().isoformat()
+    
+    # Convert flight_ids to list if not present? It is optional default [].
     
     try:
-        res = supabase.table("bookings").insert(booking_data).execute()
-        if not res.data:
-            raise HTTPException(status_code=500, detail="Failed to create booking")
+        data = supabase.table("bookings").insert(booking_data).execute()
+        if not data.data: # Check for empty response
+             raise HTTPException(status_code=500, detail="Failed to create booking")
+             
+        new_booking = data.data[0]
         
-        created_booking = res.data[0]
+        # Create initial event
+        event = BookingEvent(
+            booking_ref_id=new_booking['ref_id'],
+            status=BookingStatus.BOOKED,
+            location=new_booking['origin'],
+            metadata={"message": "Booking created"}
+        )
+        # Use our existing function logic or direct insert
+        # We can just insert event
+        event_data = event.model_dump()
+        event_data['timestamp'] = event_data['timestamp'].isoformat()
+        # remove id to let DB generate if needed
+        del event_data['id']
         
-        # Create Initial Event
-        event_data = {
-            "booking_ref_id": created_booking["ref_id"],
-            "status": BookingStatus.BOOKED,
-            "timestamp": created_booking["created_at"],
-            "metadata": {"action": "created"}
-        }
         supabase.table("booking_events").insert(event_data).execute()
-        
-        return BookingDataset(**created_booking)
+
+        # format response
+        new_booking['events'] = [event.model_dump()] # Convert event back to dict for response
+        return BookingDataset(**new_booking)
         
     except Exception as e:
-        # Check for duplicate key error logic if needed, simplify for now
+        print(e)
         raise HTTPException(status_code=400, detail=str(e))
+
+@app.get("/bookings/my-bookings", response_model=List[BookingDataset])
+def get_user_bookings(current_user: dict = Depends(get_current_user)):
+    """
+    Get all bookings for the authenticated user.
+    """
+    res = supabase.table("bookings").select("*").eq("user_id", current_user["id"]).order("created_at", desc=True).execute()
+    
+    bookings = []
+    for b in res.data:
+        # Fetch events for each booking? 
+        # Or maybe just basic info is enough for list view?
+        # The model requires 'events', so let's fetch them or default to empty/None if allowed.
+        # BookingDataset has events: Optional[List[BookingEvent]] = None
+        # So we can just leave it as None for list view to verify faster,
+        # or fetch. Fetching N times is slow.
+        # For now let's just return basic data, user can fetch details by ID.
+        bookings.append(BookingDataset(**b))
+        
+    return bookings
 
 @app.get("/bookings/{ref_id}", response_model=BookingDataset)
 def get_booking(ref_id: str):
@@ -225,7 +406,7 @@ def depart_booking(ref_id: str, location: str, flight_id: Optional[str] = None):
     
     # Update Status
     new_status = BookingStatus.DEPARTED
-    now = datetime.now().isoformat()
+    now = datetime.now(timezone.utc).isoformat()
     
     supabase.table("bookings").update({
         "status": new_status, 
@@ -253,7 +434,7 @@ def arrive_booking(ref_id: str, location: str):
     
     # Update Status
     new_status = BookingStatus.ARRIVED
-    now = datetime.now().isoformat()
+    now = datetime.now(timezone.utc).isoformat()
     
     supabase.table("bookings").update({
         "status": new_status, 
@@ -286,7 +467,7 @@ def cancel_booking(ref_id: str):
     
     # Update Status
     new_status = BookingStatus.CANCELLED
-    now = datetime.now().isoformat()
+    now = datetime.now(timezone.utc).isoformat()
     
     supabase.table("bookings").update({
         "status": new_status, 
@@ -304,86 +485,5 @@ def cancel_booking(ref_id: str):
     
     return {"message": "Booking cancelled", "status": new_status}
 
-# --- User Management ---
-
-import bcrypt
-
-class UserCreate(BaseModel):
-    email: str = Field(..., description="User email")
-    password: str = Field(..., description="User password")
-    name: str = Field(..., description="User full name")
-    dob: Optional[date] = None
-
-class UserLogin(BaseModel):
-    email: str
-    password: str
-
-class UserResponse(BaseModel):
-    id: str
-    email: str
-    name: str
-    dob: Optional[date]
-    created_at: datetime
-
-def get_password_hash(password: str) -> str:
-    # bcrypt requires bytes
-    pwd_bytes = password.encode('utf-8')
-    salt = bcrypt.gensalt()
-    return bcrypt.hashpw(pwd_bytes, salt).decode('utf-8')
-
-def verify_password(plain_password: str, hashed_password: str) -> bool:
-    pwd_bytes = plain_password.encode('utf-8')
-    hash_bytes = hashed_password.encode('utf-8')
-    return bcrypt.checkpw(pwd_bytes, hash_bytes)
-
-@app.post("/users/signup", response_model=UserResponse)
-def signup(user: UserCreate):
-    # Check if email exists
-    res = supabase.table("users").select("id").eq("email", user.email).execute()
-    if res.data:
-        raise HTTPException(status_code=400, detail="Email already registered")
-
-    # Hash password
-    hashed_pwd = get_password_hash(user.password)
-    
-    user_data = {
-        "email": user.email,
-        "password": hashed_pwd,
-        "name": user.name,
-        "dob": user.dob.isoformat() if user.dob else None,
-        "created_at": datetime.now().isoformat()
-    }
-    
-    try:
-        res_insert = supabase.table("users").insert(user_data).execute()
-        if not res_insert.data:
-             raise HTTPException(status_code=500, detail="Failed to create user")
-             
-        created_user = res_insert.data[0]
-        return UserResponse(**created_user)
-        
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-@app.post("/users/login")
-def login(user: UserLogin):
-    # Fetch user by email
-    res = supabase.table("users").select("*").eq("email", user.email).execute()
-    if not res.data:
-        raise HTTPException(status_code=400, detail="Invalid email or password")
-    
-    db_user = res.data[0]
-    
-    # Verify password
-    if not verify_password(user.password, db_user["password"]):
-        raise HTTPException(status_code=400, detail="Invalid email or password")
-        
-    return {
-        "message": "Login successful", 
-        "user": {
-            "id": db_user["id"],
-            "email": db_user["email"],
-            "name": db_user["name"]
-        }
-    }
+    return {"message": "Booking cancelled", "status": new_status}
 

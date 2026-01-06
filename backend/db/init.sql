@@ -9,7 +9,10 @@ CREATE TABLE IF NOT EXISTS flights (
     departure_datetime TIMESTAMPTZ NOT NULL,
     arrival_datetime TIMESTAMPTZ NOT NULL,
     origin TEXT NOT NULL,
-    destination TEXT NOT NULL
+    destination TEXT NOT NULL,
+    max_weight_kg INTEGER DEFAULT 5000, -- Default 5,000kg capacity
+    booked_weight_kg INTEGER DEFAULT 0, -- Starts at 0
+    base_price_per_kg DECIMAL(10, 2) DEFAULT 5.00
 );
 
 -- Create Bookings Table
@@ -20,6 +23,7 @@ CREATE TABLE IF NOT EXISTS bookings (
     pieces INTEGER NOT NULL,
     weight_kg INTEGER NOT NULL,
     status TEXT NOT NULL CHECK (status IN ('BOOKED', 'DEPARTED', 'ARRIVED', 'DELIVERED', 'CANCELLED')),
+    user_id UUID REFERENCES users(id),
     flight_ids TEXT[] DEFAULT '{}',
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
@@ -47,7 +51,7 @@ CREATE TABLE IF NOT EXISTS users (
 );
 
 -- Create Indexes for performance
-CREATE INDEX IF NOT EXISTS idx_flights_origin_dest_date ON flights (origin, destination, departure_datetime);
+CREATE INDEX IF NOT EXISTS idx_flight_route ON flights (origin, destination, departure_datetime);
 CREATE INDEX IF NOT EXISTS idx_bookings_ref_id ON bookings (ref_id);
 CREATE INDEX IF NOT EXISTS idx_booking_events_ref_id ON booking_events (booking_ref_id);
 CREATE INDEX IF NOT EXISTS idx_users_email ON users (email);

@@ -186,3 +186,7 @@ next-env.d.ts
 # initials for dev
 initials.txt
 secret.json
+generate_flights_sql.py
+flight_inserts.md 
+migration_01_add_user-id.md
+test.csv.csv
