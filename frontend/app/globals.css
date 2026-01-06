@@ -108,3 +108,88 @@ body {
     display: flex !important;
   }
 }
+
+/* Ant Design Message & Notification Z-Index Override */
+.ant-message,
+.ant-notification,
+.ant-notification-notice {
+  z-index: 100000001 !important;
+}
+
+/* Flight Search Responsive Styles */
+.search-container {
+  padding: 40px 0;
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
+.flight-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.flight-card-price-section {
+  text-align: right;
+}
+
+.flight-segment-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  padding: 8px;
+  background: #fafafa;
+  border-radius: 8px;
+}
+
+.flight-segment-info {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
+
+@media (max-width: 576px) {
+  .search-container {
+    padding: 20px 16px !important;
+  }
+
+  .flight-card-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .flight-card-price-section {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 12px;
+    text-align: left;
+  }
+
+  .flight-card-price-section>div {
+    margin-top: 0 !important;
+  }
+
+  .flight-segment-row {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .flight-segment-info {
+    flex-wrap: wrap;
+    gap: 8px;
+    font-size: 13px;
+    /* Slightly smaller text */
+  }
+}
+
+/* Custom Menu Underline Color and Thickness */
+.ant-menu-horizontal>.ant-menu-item-selected::after,
+.ant-menu-horizontal>.ant-menu-item:hover::after {
+  border-bottom-color: #1f187b !important;
+  /* Dark Blue/Black for visibility */
+  border-bottom-width: 3px !important;
+  /* Thicker line */
+}

@@ -1,10 +1,11 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Form, Input, Button, Card, Typography, DatePicker, message, Space } from 'antd';
-import { UserOutlined, LockOutlined, CalendarOutlined, IdcardOutlined } from '@ant-design/icons';
+import { Form, Input, Button, Card, Typography, DatePicker, message, Space, Divider } from 'antd';
+import { UserOutlined, LockOutlined, CalendarOutlined, IdcardOutlined, GoogleOutlined } from '@ant-design/icons';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { signIn } from 'next-auth/react';
 
 const { Title, Text } = Typography;
 
@@ -87,6 +88,14 @@ export default function SignupPage() {
                         <Title level={3} style={{ marginBottom: '8px' }}>Create an account</Title>
                         <Text type="secondary">Sign up to get started</Text>
                     </div>
+
+                    <Space direction="vertical" style={{ width: '100%' }} size={12}>
+                        <Button block size="large" icon={<GoogleOutlined />} style={{ height: '48px' }} onClick={() => signIn('google')}>
+                            Sign up with Google
+                        </Button>
+                    </Space>
+
+                    <Divider style={{ margin: '32px 0', color: '#8c8c8c' }} plain><Text type="secondary" style={{ fontSize: '12px' }}>Or continue with</Text></Divider>
 
                     <Form
                         name="signup"

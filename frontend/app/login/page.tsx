@@ -1,15 +1,21 @@
 'use client';
 
-import React from 'react';
-import { Form, Input, Button, Card, Divider, Typography, Space } from 'antd';
+import { Suspense } from 'react';
+import { Form, Input, Button, Card, Divider, Typography, Space, Spin } from 'antd';
 import { AppleFilled, GoogleOutlined, LockOutlined, UserOutlined } from '@ant-design/icons';
 import Link from 'next/link';
+import { signIn } from 'next-auth/react';
+import { useSearchParams } from 'next/navigation';
 
 const { Title, Text } = Typography;
 
-export default function LoginPage() {
+function LoginForm() {
+    const searchParams = useSearchParams();
+    const callbackUrl = searchParams.get('callbackUrl') || '/';
+
     const onFinish = (values: any) => {
         console.log('Received values of form: ', values);
+        // For credentials login, you would also pass callbackUrl here if using signIn('credentials', ...)
     };
 
     return (
@@ -22,9 +28,6 @@ export default function LoginPage() {
             padding: '24px'
         }}>
             <div style={{ width: '100%', maxWidth: '440px' }}>
-
-
-
                 <Card
                     variant="borderless"
                     style={{
@@ -39,7 +42,13 @@ export default function LoginPage() {
                     </div>
 
                     <Space direction="vertical" style={{ width: '100%' }} size={12}>
-                        <Button block size="large" icon={<GoogleOutlined />} style={{ height: '48px' }}>
+                        <Button
+                            block
+                            size="large"
+                            icon={<GoogleOutlined />}
+                            style={{ height: '48px' }}
+                            onClick={() => signIn('google', { callbackUrl })}
+                        >
                             Login with Google
                         </Button>
                     </Space>
@@ -94,5 +103,13 @@ export default function LoginPage() {
 
             </div>
         </div>
+    );
+}
+
+export default function LoginPage() {
+    return (
+        <Suspense fallback={<div style={{ minHeight: '100vh', display: 'flex', justifyContent: 'center', alignItems: 'center' }}><Spin size="large" /></div>}>
+            <LoginForm />
+        </Suspense>
     );
 }

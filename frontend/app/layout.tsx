@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google"; // Keeping fonts as they a
 import "./globals.css";
 import AntdRegistry from "@/components/AntdRegistry";
 import MainLayout from "@/components/MainLayout";
+import { AuthProvider } from "@/components/AuthProvider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -31,9 +32,11 @@ export default function RootLayout({
         style={{ margin: 0, padding: 0, backgroundColor: "white" }}
       >
         <AntdRegistry>
-          <MainLayout>
-            {children}
-          </MainLayout>
+          <AuthProvider>
+            <MainLayout>
+              {children}
+            </MainLayout>
+          </AuthProvider>
         </AntdRegistry>
       </body>
     </html>

@@ -185,3 +185,4 @@ next-env.d.ts
 
 # initials for dev
 initials.txt
+secret.json

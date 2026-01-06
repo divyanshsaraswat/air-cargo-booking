@@ -1,13 +1,15 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Layout, Button, Typography, Space, Drawer } from 'antd';
+import { Layout, Button, Typography, Space, Drawer, Dropdown, MenuProps, Menu } from 'antd';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useSession, signOut } from 'next-auth/react';
 import { useTheme } from './ThemeContext';
 import ThemeToggle from './ThemeToggle';
 import DotGrid from '@/components/DotGrid';
-import { MenuOutlined, CloseOutlined } from '@ant-design/icons';
+import UserAvatar from '@/components/UserAvatar';
+import { MenuOutlined, CloseOutlined, LogoutOutlined, UserOutlined, HomeOutlined, RadarChartOutlined, SearchOutlined } from '@ant-design/icons';
 import gsap from 'gsap';
 
 const { Header, Content, Footer } = Layout;
@@ -20,6 +22,7 @@ export default function MainLayout({
 }) {
     const pathname = usePathname();
     const { isDarkMode } = useTheme();
+    const { data: session, status } = useSession();
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
     // Animation Refs
@@ -119,6 +122,29 @@ export default function MainLayout({
         return () => mm.revert();
     }, []);
 
+    // Dropdown Items
+    const items: MenuProps['items'] = [
+        {
+            key: 'profile',
+            label: (
+                <Link href="/profile">
+                    Profile
+                </Link>
+            ),
+            icon: <UserOutlined />,
+        },
+        {
+            type: 'divider',
+        },
+        {
+            key: 'logout',
+            label: 'Logout',
+            icon: <LogoutOutlined />,
+            danger: true,
+            onClick: () => signOut(),
+        },
+    ];
+
     return (
         <Layout style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: isDarkMode ? '#121212' : '#ffffff' }}>
             {/* DotGrid Background */}
@@ -173,30 +199,56 @@ export default function MainLayout({
                     </div>
                 </Link>
 
-                {/* Navigation - Minimalist Text Links (Desktop) */}
-                <div ref={navRef}>
-                    <Space size={40} className="responsive-nav" style={{ display: 'flex' }}>
-                        <Link href="/" passHref>
-                            <Text strong={pathname === '/'} style={{ color: isDarkMode ? 'white' : undefined }}>Home</Text>
-                        </Link>
-                        <Link href="/booking" passHref>
-                            <Text strong={pathname === '/booking'} style={{ color: isDarkMode ? 'white' : undefined }}>Booking</Text>
-                        </Link>
-                        <Link href="/tracking" passHref>
-                            <Text strong={pathname === '/tracking'} style={{ color: isDarkMode ? 'white' : undefined }}>Track</Text>
-                        </Link>
-                    </Space>
+                {/* Navigation - Menu Component (Desktop) */}
+                <div ref={navRef} style={{ flex: 1, display: 'flex', justifyContent: 'center' }}>
+                    <Menu
+                        mode="horizontal"
+                        selectedKeys={[pathname]}
+                        style={{
+                            background: 'transparent',
+                            borderBottom: 'none',
+                            lineHeight: '72px',
+                            width: '100%',
+                            justifyContent: 'center',
+                            fontSize: '15px'
+                        }}
+                        items={[
+                            {
+                                key: '/',
+                                icon: <HomeOutlined />,
+                                label: <Link href="/">Home</Link>
+                            },
+                            {
+                                key: '/tracking',
+                                icon: <RadarChartOutlined />,
+                                label: <Link href="/tracking">Track</Link>
+                            },
+                            {
+                                key: '/search',
+                                icon: <SearchOutlined />,
+                                label: <Link href="/search">Search Flights</Link>
+                            }
+                        ]}
+                    />
                 </div>
 
                 {/* Desktop CTA & Toggle */}
                 <div ref={ctaRef}>
                     <Space size={16} className="desktop-cta">
                         {/* <ThemeToggle /> */}
-                        <Link href="/login">
-                            <Button type="primary" size="middle" shape="round">
-                                Get Started
-                            </Button>
-                        </Link>
+                        {status === 'authenticated' && session?.user ? (
+                            <Dropdown menu={{ items }} placement="bottomRight" arrow>
+                                <div style={{ cursor: 'pointer' }}>
+                                    <UserAvatar name={session.user.name} />
+                                </div>
+                            </Dropdown>
+                        ) : (
+                            <Link href="/login">
+                                <Button type="primary" size="middle" shape="round">
+                                    Get Started
+                                </Button>
+                            </Link>
+                        )}
                     </Space>
                 </div>
 
@@ -207,11 +259,9 @@ export default function MainLayout({
 
                 {/* Mobile Menu Drawer */}
                 <Drawer
-                    // ... drawer props
                     title="Menu"
                     placement="right"
                     onClose={() => setMobileMenuOpen(false)}
-                    // ...
                     open={mobileMenuOpen}
                     width={'100%'}
                     zIndex={10000}
@@ -231,23 +281,31 @@ export default function MainLayout({
                         }
                     }}
                 >
-                    {/* ... Drawer Content ... */}
                     <Link href="/" onClick={() => setMobileMenuOpen(false)} style={{ fontSize: '24px', fontWeight: 600, color: isDarkMode ? 'white' : '#0e0b38', textAlign: 'center' }}>
                         Home
-                    </Link>
-                    <Link href="/booking" onClick={() => setMobileMenuOpen(false)} style={{ fontSize: '24px', fontWeight: 600, color: isDarkMode ? 'white' : '#0e0b38', textAlign: 'center' }}>
-                        Booking
                     </Link>
                     <Link href="/tracking" onClick={() => setMobileMenuOpen(false)} style={{ fontSize: '24px', fontWeight: 600, color: isDarkMode ? 'white' : '#0e0b38', textAlign: 'center' }}>
                         Track
                     </Link>
+                    <Link href="/search" onClick={() => setMobileMenuOpen(false)} style={{ fontSize: '24px', fontWeight: 600, color: isDarkMode ? 'white' : '#0e0b38', textAlign: 'center' }}>
+                        Search Flights
+                    </Link>
 
                     <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: '24px' }}>
-                        <Link href="/login" onClick={() => setMobileMenuOpen(false)}>
-                            <Button type="primary" size="large" block style={{ height: '56px', fontSize: '18px' }}>
-                                Get Started
-                            </Button>
-                        </Link>
+                        {status === 'authenticated' && session?.user ? (
+                            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '12px' }}>
+                                <UserAvatar name={session.user.name} size={48} />
+                                <Text style={{ fontSize: '18px', fontWeight: 600, color: isDarkMode ? 'white' : '#0e0b38' }}>
+                                    {session.user.name}
+                                </Text>
+                            </div>
+                        ) : (
+                            <Link href="/login" onClick={() => setMobileMenuOpen(false)}>
+                                <Button type="primary" size="large" block style={{ height: '56px', fontSize: '18px' }}>
+                                    Get Started
+                                </Button>
+                            </Link>
+                        )}
                     </div>
                 </Drawer>
             </Header>

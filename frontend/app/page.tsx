@@ -1,11 +1,13 @@
 'use client';
 
-import React from 'react';
+import React, { Suspense } from 'react';
 import { Typography, Row, Col, Button, Input } from 'antd';
 import { RocketOutlined, ArrowRightOutlined, RobotOutlined } from '@ant-design/icons';
 import Link from 'next/link';
 import { useTheme } from '@/components/ThemeContext';
 import DotTextType from '@/components/DotTextType';
+
+import FlightSearch from '@/components/FlightSearch';
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -82,6 +84,13 @@ export default function Home() {
         </div>
 
 
+      </div>
+
+      {/* Flight Search Section */}
+      <div style={{ marginTop: '60px', marginBottom: '60px' }}>
+        <Suspense fallback={<div>Loading Search...</div>}>
+          <FlightSearch mode="widget" />
+        </Suspense>
       </div>
 
       {/* Interactive/Mockup Section */}
