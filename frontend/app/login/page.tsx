@@ -1,21 +1,35 @@
 'use client';
 
-import { Suspense } from 'react';
-import { Form, Input, Button, Card, Divider, Typography, Space, Spin } from 'antd';
-import { AppleFilled, GoogleOutlined, LockOutlined, UserOutlined } from '@ant-design/icons';
+import { Suspense, useState } from 'react';
+import { Form, Input, Button, Card, Divider, Typography, Space, Spin, message } from 'antd';
+import { GoogleOutlined, LockOutlined, UserOutlined } from '@ant-design/icons';
 import Link from 'next/link';
 import { signIn } from 'next-auth/react';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 
 const { Title, Text } = Typography;
 
 function LoginForm() {
+    const router = useRouter(); // Import this
     const searchParams = useSearchParams();
     const callbackUrl = searchParams.get('callbackUrl') || '/';
+    const [loading, setLoading] = useState(false);
 
-    const onFinish = (values: any) => {
-        console.log('Received values of form: ', values);
-        // For credentials login, you would also pass callbackUrl here if using signIn('credentials', ...)
+    const onFinish = async (values: any) => {
+        setLoading(true);
+        const res = await signIn('credentials', {
+            redirect: false,
+            email: values.email,
+            password: values.password,
+            callbackUrl
+        });
+        setLoading(false);
+
+        if (res?.error) {
+            message.error("Invalid email or password");
+        } else {
+            router.push(callbackUrl);
+        }
     };
 
     return (
@@ -29,7 +43,7 @@ function LoginForm() {
         }}>
             <div style={{ width: '100%', maxWidth: '440px' }}>
                 <Card
-                    variant="borderless"
+                    bordered={false}
                     style={{
                         boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
                         borderRadius: '16px'
@@ -83,7 +97,7 @@ function LoginForm() {
                         </Form.Item>
 
                         <Form.Item style={{ marginBottom: 0, marginTop: '24px' }}>
-                            <Button type="primary" htmlType="submit" block size="large" style={{ height: '48px', fontWeight: 600 }}>
+                            <Button type="primary" htmlType="submit" block size="large" loading={loading} style={{ height: '48px', fontWeight: 600 }}>
                                 Login
                             </Button>
                         </Form.Item>

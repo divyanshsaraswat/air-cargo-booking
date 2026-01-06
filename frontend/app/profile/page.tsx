@@ -10,53 +10,48 @@ import UserAvatar from '@/components/UserAvatar';
 const { Title, Text } = Typography;
 
 interface Booking {
-    id: string;
+    ref_id: string;
     origin: string;
     destination: string;
-    date: string;
-    airline: string;
-    flightNumber: string;
-    status: 'Confirmed' | 'Pending' | 'Cancelled';
-    price: number;
-    description: string;
-    duration: string;
-    departureTime: string;
+    status: string;
+    weight_kg: number;
+    pieces: number;
+    created_at: string;
+    events: any[];
 }
-
-const MOCK_BOOKINGS: Booking[] = [
-    {
-        id: 'BK-12345',
-        origin: 'DEL',
-        destination: 'BLR',
-        date: '2026-02-10',
-        airline: 'SkyLines',
-        flightNumber: 'SL505',
-        status: 'Confirmed',
-        price: 150,
-        description: 'New Delhi to Bengaluru',
-        duration: '2h 45m',
-        departureTime: '10:30'
-    },
-    {
-        id: 'BK-67890',
-        origin: 'BOM',
-        destination: 'DXB',
-        date: '2026-03-01',
-        airline: 'GlobalWings',
-        flightNumber: 'GW101',
-        status: 'Confirmed',
-        price: 450,
-        description: 'Mumbai to Dubai',
-        duration: '3h 30m',
-        departureTime: '14:15'
-    }
-];
 
 export default function ProfilePage() {
     const { data: session, status } = useSession();
     const router = useRouter();
     const [drawerOpen, setDrawerOpen] = useState(false);
     const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
+    const [bookings, setBookings] = useState<Booking[]>([]);
+    const [loadingBookings, setLoadingBookings] = useState(false);
+
+    React.useEffect(() => {
+        if (session?.accessToken) {
+            fetchBookings();
+        }
+    }, [session]);
+
+    const fetchBookings = async () => {
+        setLoadingBookings(true);
+        try {
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/bookings/my-bookings`, {
+                headers: {
+                    'Authorization': `Bearer ${session?.accessToken}`
+                }
+            });
+            if (res.ok) {
+                const data = await res.json();
+                setBookings(data);
+            }
+        } catch (error) {
+            console.error("Failed to fetch bookings", error);
+        } finally {
+            setLoadingBookings(false);
+        }
+    };
 
     if (status === 'loading') {
         return (
@@ -72,7 +67,6 @@ export default function ProfilePage() {
     }
 
     // Determine values to display
-    // Using session data or placeholders as we are simulating backend for now
     const user = session?.user;
     const displayName = user?.name || 'User Name';
     const displayEmail = user?.email || 'user@example.com';
@@ -132,32 +126,40 @@ export default function ProfilePage() {
 
                 {/* Your Bookings Section */}
                 <Card title="Your Bookings" bordered={false} style={{ borderRadius: '16px', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
-                    <List
-                        itemLayout="horizontal"
-                        dataSource={MOCK_BOOKINGS}
-                        renderItem={(item) => (
-                            <List.Item
-                                actions={[<Button type="link" onClick={() => {
-                                    setSelectedBooking(item);
-                                    setDrawerOpen(true);
-                                }}>View Details</Button>]}
-                            >
-                                <List.Item.Meta
-                                    avatar={<Avatar icon={<RocketOutlined />} style={{ backgroundColor: '#1890ff' }} />}
-                                    title={<Text strong>{item.origin} <ArrowRightOutlined /> {item.destination}</Text>}
-                                    description={
-                                        <div>
-                                            <div style={{ marginBottom: 4 }}>{item.date} • {item.airline}</div>
-                                            <Tag color={item.status === 'Confirmed' ? 'green' : 'orange'}>{item.status}</Tag>
-                                        </div>
-                                    }
-                                />
-                                <div>
-                                    <Text strong>${item.price}</Text>
-                                </div>
-                            </List.Item>
-                        )}
-                    />
+                    {loadingBookings ? (
+                        <div style={{ textAlign: 'center', padding: '20px' }}><Spin /></div>
+                    ) : bookings.length === 0 ? (
+                        <div style={{ textAlign: 'center', padding: '20px' }}>
+                            <Text type="secondary">No bookings found.</Text>
+                        </div>
+                    ) : (
+                        <List
+                            itemLayout="horizontal"
+                            dataSource={bookings}
+                            renderItem={(item) => (
+                                <List.Item
+                                    actions={[<Button type="link" onClick={() => {
+                                        setSelectedBooking(item);
+                                        setDrawerOpen(true);
+                                    }}>View Details</Button>]}
+                                >
+                                    <List.Item.Meta
+                                        avatar={<Avatar icon={<RocketOutlined />} style={{ backgroundColor: '#1890ff' }} />}
+                                        title={<Text strong>{item.origin} <ArrowRightOutlined /> {item.destination}</Text>}
+                                        description={
+                                            <div>
+                                                <div style={{ marginBottom: 4 }}>Ref: {item.ref_id} • {new Date(item.created_at).toLocaleDateString()}</div>
+                                                <Tag color={item.status === 'BOOKED' ? 'green' : 'orange'}>{item.status}</Tag>
+                                            </div>
+                                        }
+                                    />
+                                    <div>
+                                        <Text strong>{item.weight_kg} kg</Text>
+                                    </div>
+                                </List.Item>
+                            )}
+                        />
+                    )}
                 </Card>
             </div>
 
@@ -177,31 +179,26 @@ export default function ProfilePage() {
                             <Title level={4} style={{ margin: 0 }}>
                                 {selectedBooking.origin} <ArrowRightOutlined /> {selectedBooking.destination}
                             </Title>
-                            <Text type="secondary" style={{ display: 'block', marginTop: 8 }}>Booking Ref: {selectedBooking.id}</Text>
+                            <Text type="secondary" style={{ display: 'block', marginTop: 8 }}>Booking Ref: {selectedBooking.ref_id}</Text>
                             <Tag color="green" style={{ marginTop: 8 }} icon={<CheckCircleOutlined />}>{selectedBooking.status}</Tag>
                         </div>
 
                         <Divider />
 
                         {/* Flight Info Card */}
-                        <Card title="Flight Information" size="small" style={{ background: '#fafafa', marginBottom: 24 }}>
+                        <Card title="Cargo Information" size="small" style={{ background: '#fafafa', marginBottom: 24 }}>
                             <Descriptions column={1} size="small">
-                                <Descriptions.Item label="Airline">{selectedBooking.airline}</Descriptions.Item>
-                                <Descriptions.Item label="Flight No">{selectedBooking.flightNumber}</Descriptions.Item>
-                                <Descriptions.Item label="Date">{selectedBooking.date}</Descriptions.Item>
-                                <Descriptions.Item label="Departure">{selectedBooking.departureTime}</Descriptions.Item>
-                                <Descriptions.Item label="Duration">{selectedBooking.duration}</Descriptions.Item>
+                                <Descriptions.Item label="Weight">{selectedBooking.weight_kg} kg</Descriptions.Item>
+                                <Descriptions.Item label="Pieces">{selectedBooking.pieces}</Descriptions.Item>
+                                <Descriptions.Item label="Created At">
+                                    {new Date(selectedBooking.created_at).toLocaleString('en-IN', {
+                                        timeZone: 'Asia/Kolkata',
+                                        dateStyle: 'medium',
+                                        timeStyle: 'medium'
+                                    })} (IST)
+                                </Descriptions.Item>
                             </Descriptions>
                         </Card>
-
-                        {/* Payment Info */}
-                        <Card title="Payment Summary" size="small" style={{ background: '#fafafa' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                <Text>Total Amount Paid</Text>
-                                <Text strong>${selectedBooking.price}</Text>
-                            </div>
-                        </Card>
-
                     </div>
                 )}
             </Drawer>

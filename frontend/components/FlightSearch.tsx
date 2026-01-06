@@ -1,9 +1,11 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Form, Select, DatePicker, Button, Card, Typography, List, Tag, Divider, Row, Col, Empty, Drawer, InputNumber, notification, message } from 'antd';
+import { Form, Select, DatePicker, Button, Card, Typography, List, Tag, Divider, Row, Col, Empty, Drawer, InputNumber, notification, message, type FormInstance } from 'antd';
 import { SearchOutlined, RocketOutlined, ArrowRightOutlined } from '@ant-design/icons';
 import dayjs, { Dayjs } from 'dayjs';
+import utc from 'dayjs/plugin/utc';
+dayjs.extend(utc);
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 
@@ -18,8 +20,14 @@ interface Flight {
     destination: string;
     departureTime: string; // HH:mm
     duration: string;
-    price: number;
+    price: number; // Represents base rate or calculated price
     date: string; // YYYY-MM-DD
+    // New fields from backend
+    maxWeight?: number;
+    bookedWeight?: number;
+    basePrice?: number;
+    arrivalDate?: string;
+    arrivalTime?: string;
 }
 
 interface Route {
@@ -38,6 +46,15 @@ const AIRPORTS = [
     { code: 'LHR', name: 'London (LHR)' },
     { code: 'JFK', name: 'New York (JFK)' },
     { code: 'HKG', name: 'Hong Kong (HKG)' },
+    { code: 'LAX', name: 'Los Angeles (LAX)' },
+    { code: 'ICN', name: 'Seoul (ICN)' },
+    { code: 'CDG', name: 'Paris (CDG)' },
+    { code: 'FRA', name: 'Frankfurt (FRA)' },
+    { code: 'IST', name: 'Istanbul (IST)' },
+    { code: 'SIN', name: 'Singapore (SIN)' },
+    { code: 'AMS', name: 'Amsterdam (AMS)' },
+    { code: 'HND', name: 'Tokyo (HND)' },
+    { code: 'SFO', name: 'San Francisco (SFO)' },
 ];
 
 const MOCK_AIRLINES = ['SkyLines', 'AeroJet', 'GlobalWings', 'AirConnect'];
@@ -45,6 +62,33 @@ const MOCK_AIRLINES = ['SkyLines', 'AeroJet', 'GlobalWings', 'AirConnect'];
 interface FlightSearchProps {
     mode?: 'widget' | 'page';
 }
+
+// Helper components for real-time price calculation
+const PriceCalculator = ({ form }: { form: FormInstance }) => {
+    const weight = Form.useWatch('weight', form);
+    return <>{weight || 0}</>;
+};
+
+const SubtotalDisplay = ({ form, basePrice }: { form: FormInstance, basePrice?: number }) => {
+    const weight = Form.useWatch('weight', form);
+    const subtotal = (weight || 0) * (basePrice || 0);
+    return <>${subtotal.toFixed(2)}</>;
+};
+
+const TaxDisplay = ({ form, basePrice }: { form: FormInstance, basePrice?: number }) => {
+    const weight = Form.useWatch('weight', form);
+    const subtotal = (weight || 0) * (basePrice || 0);
+    const tax = subtotal * 0.18;
+    return <>${tax.toFixed(2)}</>;
+};
+
+const TotalDisplay = ({ form, basePrice }: { form: FormInstance, basePrice?: number }) => {
+    const weight = Form.useWatch('weight', form);
+    const subtotal = (weight || 0) * (basePrice || 0);
+    const tax = subtotal * 0.18;
+    const total = subtotal + tax;
+    return <>${total.toFixed(2)}</>;
+};
 
 export default function FlightSearch({ mode = 'page' }: FlightSearchProps) {
     const [loading, setLoading] = useState(false);
@@ -120,65 +164,106 @@ export default function FlightSearch({ mode = 'page' }: FlightSearchProps) {
         };
     };
 
-    const performSearch = (values: any) => {
+    const performSearch = async (values: any) => {
         setLoading(true);
         setResults(null);
 
-        // Simulate API delay
-        setTimeout(() => {
+        try {
             const { origin, destination, date } = values;
-            const searchDate = dayjs(date);
-            const newResults: Route[] = [];
+            const dateStr = date.format('YYYY-MM-DD');
 
-            // 1. Direct Flight
-            const directFlight = generateFlight(origin, destination, searchDate);
-            newResults.push({
-                type: 'direct',
-                flights: [directFlight],
-                totalPrice: directFlight.price,
-                totalDuration: directFlight.duration,
+            const API_URL = `${process.env.NEXT_PUBLIC_API_URL}/route?origin=${origin}&destination=${destination}&date=${dateStr}`;
+            console.log("Fetching from:", API_URL);
+
+            const res = await fetch(API_URL);
+            if (!res.ok) {
+                throw new Error('Failed to fetch flights');
+            }
+
+            const data: any[][] = await res.json();
+
+            // Map backend response to frontend Route structure
+            const newResults: Route[] = data.map((routeFlights: any[]) => {
+                const mappedFlights: Flight[] = routeFlights.map(f => {
+                    // Force interprete as UTC then convert to IST (UTC+5:30)
+                    // Since f.departure_datetime includes offset (e.g. +00), dayjs parses it correctly as local time.
+                    // But we want to FORCE display as IST.
+                    // IST is UTC+5.5
+
+                    const depUTC = dayjs(f.departure_datetime).utc();
+                    const arrUTC = dayjs(f.arrival_datetime).utc();
+
+                    // Manually add offset for IST display if plugins aren't available
+                    // dayjs().add(5.5, 'hour') represents the time in IST
+                    const depIST = depUTC.add(330, 'minute');
+                    const arrIST = arrUTC.add(330, 'minute');
+
+                    const diffMinutes = arrIST.diff(depIST, 'minute');
+                    const hours = Math.floor(diffMinutes / 60);
+                    const mins = diffMinutes % 60;
+                    const durationStr = `${hours}h ${mins}m`;
+
+                    return {
+                        id: f.flight_id,
+                        airline: f.airline_name,
+                        flightNumber: f.flight_number,
+                        origin: f.origin,
+                        destination: f.destination,
+                        departureTime: depIST.format('HH:mm'), // Raw HH:mm
+                        duration: durationStr,
+                        price: f.base_price_per_kg,
+                        date: depIST.format('YYYY-MM-DD'),
+                        maxWeight: f.max_weight_kg,
+                        bookedWeight: f.booked_weight_kg,
+                        basePrice: f.base_price_per_kg,
+                        arrivalDate: arrIST.format('YYYY-MM-DD'),
+                        arrivalTime: arrIST.format('HH:mm') // Raw HH:mm
+                    };
+                });
+
+                const totalPrice = mappedFlights.reduce((sum, f) => sum + (f.price || 0), 0);
+
+                // Calculate total duration for the route (Departure of first to Arrival of last)
+                // Note: This logic for transit duration is simplified; ideally we check connection time.
+                // But taking first dep and last arr is accurate for total travel time.
+                const firstLeg = mappedFlights[0];
+                const lastLeg = mappedFlights[mappedFlights.length - 1];
+
+                // We need parsed dates again for accurate total diff
+                // Or just sum durations + layover? Summing segments is easier but misses layover.
+                // Let's rely on the dates we parsed if possible, or re-parse.
+                // Since we didn't store raw Dayjs objects in Flight interface, we re-parse strings or stick to simple sum?
+                // Better: re-parse for total duration.
+                // Assuming flight dates are YYYY-MM-DD and times are HH:mm is risky for date boundaries.
+                // Backend sends full ISO. Let's trust the backend data flow if we had it, but here we mapped it.
+                // Let's implement a simple sum for now as per previous mock, or
+                // actually, let's use the 'arrivalDate/Time' I added to be precise.
+
+                let totalDurationStr = "";
+                if (firstLeg.date && firstLeg.departureTime && lastLeg.arrivalDate && lastLeg.arrivalTime) {
+                    const start = dayjs(`${firstLeg.date} ${firstLeg.departureTime}`);
+                    const end = dayjs(`${lastLeg.arrivalDate} ${lastLeg.arrivalTime}`);
+                    const diff = end.diff(start, 'minute');
+                    totalDurationStr = `${Math.floor(diff / 60)}h ${diff % 60}m`;
+                } else {
+                    totalDurationStr = mappedFlights.map(f => f.duration).join(' + ');
+                }
+
+                return {
+                    type: mappedFlights.length > 1 ? 'transit' : 'direct',
+                    flights: mappedFlights,
+                    totalPrice: parseFloat(totalPrice.toFixed(2)),
+                    totalDuration: totalDurationStr
+                };
             });
 
-            // 2. Transit Flight Logic
-            // Find a transit hub that is not origin or destination
-            const possibleHubs = AIRPORTS.filter(a => a.code !== origin && a.code !== destination);
-            if (possibleHubs.length > 0) {
-                const hub = possibleHubs[Math.floor(Math.random() * possibleHubs.length)].code;
-
-                // Leg 1: Origin -> Hub (On Search Date)
-                const leg1 = generateFlight(origin, hub, searchDate);
-
-                // Leg 2: Hub -> Destination (Same Day or Next Day)
-                // Logic: 50% chance sameday, 50% chance next day
-                const isNextDay = Math.random() > 0.5;
-                const leg2Date = isNextDay ? searchDate.add(1, 'day') : searchDate;
-
-                const leg2 = generateFlight(hub, destination, leg2Date);
-
-                // Ensure leg2 is not after next day (Already handled by strict assignment)
-
-                newResults.push({
-                    type: 'transit',
-                    flights: [leg1, leg2],
-                    totalPrice: leg1.price + leg2.price,
-                    totalDuration: 'Transit (Layover included)', // Simplified for mock
-                });
-            }
-
-            // Generate more mock data for "Show More" effect
-            for (let i = 0; i < 3; i++) {
-                const extraDirect = generateFlight(origin, destination, searchDate);
-                newResults.push({
-                    type: 'direct',
-                    flights: [extraDirect],
-                    totalPrice: extraDirect.price + Math.floor(Math.random() * 50),
-                    totalDuration: extraDirect.duration,
-                })
-            }
-
             setResults(newResults);
+        } catch (error) {
+            console.error(error);
+            notification.error({ message: "Error fetching flights", description: "Could not load flight data." });
+        } finally {
             setLoading(false);
-        }, 1000);
+        }
     };
 
     const onFinish = (values: any) => {
@@ -263,7 +348,7 @@ export default function FlightSearch({ mode = 'page' }: FlightSearchProps) {
                     <Row>
                         <Col span={24} style={{ textAlign: 'right' }}>
                             <Button type="primary" htmlType="submit" icon={<SearchOutlined />} loading={loading} size="large">
-                                {mode === 'widget' ? 'Search Flights' : 'Update Search'}
+                                Search Flights
                             </Button>
                         </Col>
                     </Row>
@@ -316,7 +401,7 @@ export default function FlightSearch({ mode = 'page' }: FlightSearchProps) {
                                                 <div style={{ fontWeight: 600 }}>{flight.airline} <Text type="secondary" style={{ fontSize: '12px' }}>{flight.flightNumber}</Text></div>
                                                 <div>{flight.date}</div>
                                                 <div style={{ color: '#555' }}>
-                                                    {flight.origin} ({flight.departureTime}) <SearchOutlined rotate={90} style={{ fontSize: '10px', margin: '0 4px' }} /> {flight.destination}
+                                                    {flight.origin} ({flight.departureTime} IST) <SearchOutlined rotate={90} style={{ fontSize: '10px', margin: '0 4px' }} /> {flight.destination}
                                                 </div>
                                             </div>
                                             <div>{flight.duration}</div>
@@ -335,8 +420,7 @@ export default function FlightSearch({ mode = 'page' }: FlightSearchProps) {
                 placement="right"
                 onClose={() => setReviewOpen(false)}
                 open={reviewOpen}
-                width={500}
-                styles={{ body: { paddingBottom: 80 } }}
+                styles={{ body: { paddingBottom: 80 }, wrapper: { width: 500 } }}
                 zIndex={100000000}
             >
                 {selectedFlight && (
@@ -363,7 +447,7 @@ export default function FlightSearch({ mode = 'page' }: FlightSearchProps) {
 
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                                 <div>
-                                    <Title level={3} style={{ margin: 0 }}>{selectedFlight.departureTime}</Title>
+                                    <Title level={3} style={{ margin: 0 }}>{selectedFlight.departureTime} IST</Title>
                                     <Text>{selectedFlight.origin}</Text>
                                     <div style={{ fontSize: 12, color: '#888' }}>{AIRPORTS.find(a => a.code === selectedFlight.origin)?.name}</div>
                                 </div>
@@ -372,27 +456,24 @@ export default function FlightSearch({ mode = 'page' }: FlightSearchProps) {
                                     <div style={{ borderTop: '1px dashed #ccc', margin: '4px 0' }}></div>
                                 </div>
                                 <div style={{ textAlign: 'right' }}>
-                                    {/* Mocking arrival time as +duration approx */}
+                                    {/* Use pre-calculated arrival time */}
                                     <Title level={3} style={{ margin: 0 }}>
-                                        {dayjs(`${selectedFlight.date} ${selectedFlight.departureTime}`).add(parseInt(selectedFlight.duration), 'hour').format('HH:mm')}
+                                        {selectedFlight.arrivalTime ? `${selectedFlight.arrivalTime} IST` :
+                                            dayjs(`${selectedFlight.date} ${selectedFlight.departureTime}`).add(parseInt(selectedFlight.duration), 'hour').format('HH:mm') + ' IST'}
                                     </Title>
                                     <Text>{selectedFlight.destination}</Text>
                                     <div style={{ fontSize: 12, color: '#888' }}>{AIRPORTS.find(a => a.code === selectedFlight.destination)?.name}</div>
                                 </div>
                             </div>
-
-                            <Tag color="gold" style={{ marginTop: 12, borderRadius: 12, border: 'none', color: '#874d00' }}>
-                                ⏱ 30% On-time
-                            </Tag>
                         </Card>
 
                         {/* Baggage Info */}
                         <div style={{ marginBottom: 24 }}>
                             <div style={{ display: 'flex', gap: 12, marginBottom: 12 }}>
-                                <Text strong>🧳 Check-in :</Text> <Text>15 kg per adult</Text>
+                                <Text strong>📦 Max Capacity :</Text> <Text>{selectedFlight.maxWeight} kg</Text>
                             </div>
                             <div style={{ display: 'flex', gap: 12 }}>
-                                <Text strong>🎒 Cabin :</Text> <Text>7 kg per piece, 1 piece per adult</Text>
+                                <Text strong>💲 Base Rate :</Text> <Text>${selectedFlight.basePrice} / kg</Text>
                             </div>
                         </div>
 
@@ -405,7 +486,7 @@ export default function FlightSearch({ mode = 'page' }: FlightSearchProps) {
                                 form={drawerForm} // Assign the form instance
                                 layout="vertical"
                                 name="drawer_booking_form"
-                                onFinish={(values) => {
+                                onFinish={async (values) => {
                                     if (!session) {
                                         // Store current flight details to local storage
                                         localStorage.setItem('pendingBookingFlight', JSON.stringify(selectedFlight));
@@ -420,15 +501,56 @@ export default function FlightSearch({ mode = 'page' }: FlightSearchProps) {
                                     }
 
                                     setLoading(true);
-                                    setTimeout(() => {
-                                        setLoading(false);
+                                    try {
+                                        // @ts-ignore - session.user.id is added in our auth route
+                                        const userId = session.user?.id;
+
+                                        const payload = {
+                                            ref_id: `BKG-${Math.random().toString(36).substr(2, 9).toUpperCase()}`,
+                                            user_id: userId,
+                                            origin: selectedFlight.origin,
+                                            destination: selectedFlight.destination,
+                                            pieces: values.pieces,
+                                            weight_kg: values.weight,
+                                            // Ideally we should pass flight_ids if we have them. 
+                                            // selectedFlight.id is from frontend generation, might not match backend unless search was real.
+                                            // But let's pass it if it looks like a real ID or leave empty.
+                                            flight_ids: [selectedFlight.id]
+                                        };
+
+                                        console.log("Booking Payload:", payload);
+
+                                        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/bookings`, {
+                                            method: 'POST',
+                                            headers: {
+                                                'Content-Type': 'application/json',
+                                                'Authorization': `Bearer ${session.accessToken}`
+                                            },
+                                            body: JSON.stringify(payload),
+                                        });
+
+                                        if (!res.ok) {
+                                            const err = await res.json();
+                                            throw new Error(err.detail || "Booking failed");
+                                        }
+
+                                        const bookingData = await res.json();
+
                                         notification.success({
                                             message: 'Booking Confirmed!',
-                                            description: `Your booking for ${selectedFlight.origin} to ${selectedFlight.destination} has been confirmed. Ref: #${Math.floor(Math.random() * 10000)}`,
+                                            description: `Booking #${bookingData.ref_id} created successfully!`,
                                         });
                                         setReviewOpen(false);
-                                        drawerForm.resetFields(); // Reset form fields after successful booking
-                                    }, 1500);
+                                        drawerForm.resetFields();
+                                    } catch (error) {
+                                        console.error("Booking Error:", error);
+                                        notification.error({
+                                            message: 'Booking Failed',
+                                            description: error instanceof Error ? error.message : "Please try again later."
+                                        });
+                                    } finally {
+                                        setLoading(false);
+                                    }
                                 }}
                             >
                                 <Row gutter={16}>
@@ -438,14 +560,35 @@ export default function FlightSearch({ mode = 'page' }: FlightSearchProps) {
                                         </Form.Item>
                                     </Col>
                                     <Col span={12}>
-                                        <Form.Item name="weight" label="Weight (kg)" rules={[{ required: true, message: 'Required' }]}>
+                                        <Form.Item name="weight" label="Total Weight (kg)" rules={[{ required: true, message: 'Required' }]}>
                                             <InputNumber min={0.1} style={{ width: '100%' }} placeholder="kg" />
                                         </Form.Item>
                                     </Col>
                                 </Row>
 
+
+
+                                {/* Price Summary */}
+                                <div style={{ background: '#f9f9f9', padding: '16px', borderRadius: '8px', marginBottom: '24px' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                                        <Text>Subtotal ({selectedFlight.basePrice} x <PriceCalculator form={drawerForm} /> kg)</Text>
+                                        <Text strong><SubtotalDisplay form={drawerForm} basePrice={selectedFlight.basePrice} /></Text>
+                                    </div>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                                        <Text>Tax (18%)</Text>
+                                        <Text strong><TaxDisplay form={drawerForm} basePrice={selectedFlight.basePrice} /></Text>
+                                    </div>
+                                    <Divider style={{ margin: '12px 0' }} />
+                                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                        <Text strong style={{ fontSize: '16px' }}>Total Payable</Text>
+                                        <Text strong style={{ fontSize: '18px', color: '#faad14' }}>
+                                            <TotalDisplay form={drawerForm} basePrice={selectedFlight.basePrice} />
+                                        </Text>
+                                    </div>
+                                </div>
+
                                 {/* Footer Action */}
-                                <div style={{ marginTop: 24 }}>
+                                <div>
 
                                     <Button
                                         type="primary"
@@ -453,6 +596,7 @@ export default function FlightSearch({ mode = 'page' }: FlightSearchProps) {
                                         block
                                         size="large"
                                         loading={loading}
+                                        className='mb-4'
                                         style={{ height: '56px', fontSize: '18px', fontWeight: 600, background: '#faad14', borderColor: '#faad14', color: '#fff' }}
                                     >
                                         CONFIRM BOOKING
@@ -461,8 +605,9 @@ export default function FlightSearch({ mode = 'page' }: FlightSearchProps) {
                             </Form>
                         </div>
                     </div>
-                )}
-            </Drawer>
-        </div>
+                )
+                }
+            </Drawer >
+        </div >
     );
 }
