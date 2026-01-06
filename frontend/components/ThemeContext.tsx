@@ -7,6 +7,8 @@ type ThemeContextType = {
     toggleTheme: () => void;
 };
 
+const FORCE_LIGHT_MODE = true; // Switch to false to enable Dark Mode
+
 const ThemeContext = createContext<ThemeContextType>({
     isDarkMode: false,
     toggleTheme: () => { },
@@ -16,6 +18,11 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
     const [isDarkMode, setIsDarkMode] = useState(false);
 
     useEffect(() => {
+        if (FORCE_LIGHT_MODE) {
+            setIsDarkMode(false);
+            return;
+        }
+
         // Check system preference or local storage on mount
         const savedTheme = localStorage.getItem('theme');
         if (savedTheme) {
@@ -26,6 +33,8 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
     }, []);
 
     const toggleTheme = () => {
+        if (FORCE_LIGHT_MODE) return;
+
         setIsDarkMode((prev) => {
             const newMode = !prev;
             localStorage.setItem('theme', newMode ? 'dark' : 'light');

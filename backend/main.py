@@ -53,10 +53,11 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="users/login")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allows all origins
+    # In production, set FRONTEND_URL to your specific domain (e.g., "https://myapp.vercel.app")
+    allow_origins=os.getenv("FRONTEND_URL", "*").split(","),
     allow_credentials=True,
-    allow_methods=["*"],  # Allows all methods
-    allow_headers=["*"],  # Allows all headers
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # --- Enums ---
@@ -641,7 +642,5 @@ def cancel_booking(ref_id: str):
     }
     supabase.table("booking_events").insert(event_data).execute()
     
-    return {"message": "Booking cancelled", "status": new_status}
-
     return {"message": "Booking cancelled", "status": new_status}
 
