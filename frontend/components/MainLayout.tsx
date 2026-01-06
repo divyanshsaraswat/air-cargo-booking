@@ -200,7 +200,7 @@ export default function MainLayout({
                 </Link>
 
                 {/* Navigation - Menu Component (Desktop) */}
-                <div ref={navRef} style={{ flex: 1, display: 'flex', justifyContent: 'center' }}>
+                <div ref={navRef} className="responsive-nav" style={{ flex: 1, display: 'flex', justifyContent: 'center' }}>
                     <Menu
                         mode="horizontal"
                         selectedKeys={[pathname]}

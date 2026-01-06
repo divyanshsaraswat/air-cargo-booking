@@ -71,9 +71,9 @@ export default function Home() {
         </Paragraph>
 
         <div className="hero-buttons" style={{ display: 'flex', gap: '16px', justifyContent: 'center' }}>
-          <Link href="/booking">
+          <Link href="/search">
             <Button type="primary" size="large" icon={<RocketOutlined />} style={{ height: '56px', padding: '0 32px', fontSize: '18px' }}>
-              New Booking
+              Search Flights
             </Button>
           </Link>
           <Link href="/tracking">
@@ -88,7 +88,7 @@ export default function Home() {
 
       {/* Flight Search Section */}
       <div style={{ marginTop: '60px', marginBottom: '60px' }}>
-        <Suspense fallback={<div>Loading Search...</div>}>
+        <Suspense>
           <FlightSearch mode="widget" />
         </Suspense>
       </div>

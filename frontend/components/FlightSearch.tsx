@@ -11,6 +11,7 @@ import { useSession } from 'next-auth/react';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
+import useSWR from 'swr';
 
 interface Flight {
     id: string;
@@ -92,7 +93,7 @@ const TotalDisplay = ({ form, basePrice }: { form: FormInstance, basePrice?: num
 
 export default function FlightSearch({ mode = 'page' }: FlightSearchProps) {
     const [loading, setLoading] = useState(false);
-    const [results, setResults] = useState<Route[] | null>(null);
+    // results is now managed by SWR
     const router = useRouter();
     const searchParams = useSearchParams();
     const { data: session } = useSession();
@@ -164,106 +165,99 @@ export default function FlightSearch({ mode = 'page' }: FlightSearchProps) {
         };
     };
 
-    const performSearch = async (values: any) => {
-        setLoading(true);
-        setResults(null);
+    // State for SWR key
+    const [searchQuery, setSearchQuery] = useState<{ origin: string, destination: string, date: string } | null>(null);
 
-        try {
-            const { origin, destination, date } = values;
-            const dateStr = date.format('YYYY-MM-DD');
+    // SWR Fetcher
+    const fetcher = async (url: string) => {
+        console.log("Fetching from:", url);
+        const res = await fetch(url);
+        if (!res.ok) {
+            throw new Error('Failed to fetch flights');
+        }
+        const data: any[][] = await res.json();
 
-            const API_URL = `${process.env.NEXT_PUBLIC_API_URL}/route?origin=${origin}&destination=${destination}&date=${dateStr}`;
-            console.log("Fetching from:", API_URL);
+        // Map backend response to frontend Route structure
+        return data.map((routeFlights: any[]) => {
+            const mappedFlights: Flight[] = routeFlights.map(f => {
+                const depUTC = dayjs(f.departure_datetime).utc();
+                const arrUTC = dayjs(f.arrival_datetime).utc();
+                const depIST = depUTC.add(330, 'minute');
+                const arrIST = arrUTC.add(330, 'minute');
 
-            const res = await fetch(API_URL);
-            if (!res.ok) {
-                throw new Error('Failed to fetch flights');
-            }
-
-            const data: any[][] = await res.json();
-
-            // Map backend response to frontend Route structure
-            const newResults: Route[] = data.map((routeFlights: any[]) => {
-                const mappedFlights: Flight[] = routeFlights.map(f => {
-                    // Force interprete as UTC then convert to IST (UTC+5:30)
-                    // Since f.departure_datetime includes offset (e.g. +00), dayjs parses it correctly as local time.
-                    // But we want to FORCE display as IST.
-                    // IST is UTC+5.5
-
-                    const depUTC = dayjs(f.departure_datetime).utc();
-                    const arrUTC = dayjs(f.arrival_datetime).utc();
-
-                    // Manually add offset for IST display if plugins aren't available
-                    // dayjs().add(5.5, 'hour') represents the time in IST
-                    const depIST = depUTC.add(330, 'minute');
-                    const arrIST = arrUTC.add(330, 'minute');
-
-                    const diffMinutes = arrIST.diff(depIST, 'minute');
-                    const hours = Math.floor(diffMinutes / 60);
-                    const mins = diffMinutes % 60;
-                    const durationStr = `${hours}h ${mins}m`;
-
-                    return {
-                        id: f.flight_id,
-                        airline: f.airline_name,
-                        flightNumber: f.flight_number,
-                        origin: f.origin,
-                        destination: f.destination,
-                        departureTime: depIST.format('HH:mm'), // Raw HH:mm
-                        duration: durationStr,
-                        price: f.base_price_per_kg,
-                        date: depIST.format('YYYY-MM-DD'),
-                        maxWeight: f.max_weight_kg,
-                        bookedWeight: f.booked_weight_kg,
-                        basePrice: f.base_price_per_kg,
-                        arrivalDate: arrIST.format('YYYY-MM-DD'),
-                        arrivalTime: arrIST.format('HH:mm') // Raw HH:mm
-                    };
-                });
-
-                const totalPrice = mappedFlights.reduce((sum, f) => sum + (f.price || 0), 0);
-
-                // Calculate total duration for the route (Departure of first to Arrival of last)
-                // Note: This logic for transit duration is simplified; ideally we check connection time.
-                // But taking first dep and last arr is accurate for total travel time.
-                const firstLeg = mappedFlights[0];
-                const lastLeg = mappedFlights[mappedFlights.length - 1];
-
-                // We need parsed dates again for accurate total diff
-                // Or just sum durations + layover? Summing segments is easier but misses layover.
-                // Let's rely on the dates we parsed if possible, or re-parse.
-                // Since we didn't store raw Dayjs objects in Flight interface, we re-parse strings or stick to simple sum?
-                // Better: re-parse for total duration.
-                // Assuming flight dates are YYYY-MM-DD and times are HH:mm is risky for date boundaries.
-                // Backend sends full ISO. Let's trust the backend data flow if we had it, but here we mapped it.
-                // Let's implement a simple sum for now as per previous mock, or
-                // actually, let's use the 'arrivalDate/Time' I added to be precise.
-
-                let totalDurationStr = "";
-                if (firstLeg.date && firstLeg.departureTime && lastLeg.arrivalDate && lastLeg.arrivalTime) {
-                    const start = dayjs(`${firstLeg.date} ${firstLeg.departureTime}`);
-                    const end = dayjs(`${lastLeg.arrivalDate} ${lastLeg.arrivalTime}`);
-                    const diff = end.diff(start, 'minute');
-                    totalDurationStr = `${Math.floor(diff / 60)}h ${diff % 60}m`;
-                } else {
-                    totalDurationStr = mappedFlights.map(f => f.duration).join(' + ');
-                }
+                const diffMinutes = arrIST.diff(depIST, 'minute');
+                const hours = Math.floor(diffMinutes / 60);
+                const mins = diffMinutes % 60;
+                const durationStr = `${hours}h ${mins}m`;
 
                 return {
-                    type: mappedFlights.length > 1 ? 'transit' : 'direct',
-                    flights: mappedFlights,
-                    totalPrice: parseFloat(totalPrice.toFixed(2)),
-                    totalDuration: totalDurationStr
+                    id: f.flight_id,
+                    airline: f.airline_name,
+                    flightNumber: f.flight_number,
+                    origin: f.origin,
+                    destination: f.destination,
+                    departureTime: depIST.format('HH:mm'),
+                    duration: durationStr,
+                    price: f.base_price_per_kg,
+                    date: depIST.format('YYYY-MM-DD'),
+                    maxWeight: f.max_weight_kg,
+                    bookedWeight: f.booked_weight_kg,
+                    basePrice: f.base_price_per_kg,
+                    arrivalDate: arrIST.format('YYYY-MM-DD'),
+                    arrivalTime: arrIST.format('HH:mm')
                 };
             });
 
-            setResults(newResults);
-        } catch (error) {
+            const totalPrice = mappedFlights.reduce((sum, f) => sum + (f.price || 0), 0);
+            const firstLeg = mappedFlights[0];
+            const lastLeg = mappedFlights[mappedFlights.length - 1];
+
+            let totalDurationStr = "";
+            if (firstLeg.date && firstLeg.departureTime && lastLeg.arrivalDate && lastLeg.arrivalTime) {
+                const start = dayjs(`${firstLeg.date} ${firstLeg.departureTime}`);
+                const end = dayjs(`${lastLeg.arrivalDate} ${lastLeg.arrivalTime}`);
+                const diff = end.diff(start, 'minute');
+                totalDurationStr = `${Math.floor(diff / 60)}h ${diff % 60}m`;
+            } else {
+                totalDurationStr = mappedFlights.map(f => f.duration).join(' + ');
+            }
+
+            return {
+                type: mappedFlights.length > 1 ? 'transit' : 'direct',
+                flights: mappedFlights,
+                totalPrice: parseFloat(totalPrice.toFixed(2)),
+                totalDuration: totalDurationStr
+            };
+        });
+    };
+
+    // Construct SWR URL
+    const swrKey = searchQuery
+        ? `${process.env.NEXT_PUBLIC_API_URL}/route?origin=${searchQuery.origin}&destination=${searchQuery.destination}&date=${searchQuery.date}`
+        : null;
+
+    const { data: results, error, isLoading } = useSWR(swrKey, fetcher, {
+        revalidateOnFocus: false, // Flight schedules rarely change instantly
+        shouldRetryOnError: false
+    });
+
+    // Update loading state alias for UI compatibility
+    useEffect(() => {
+        setLoading(isLoading);
+    }, [isLoading]);
+
+    useEffect(() => {
+        if (error) {
             console.error(error);
             notification.error({ message: "Error fetching flights", description: "Could not load flight data." });
-        } finally {
-            setLoading(false);
         }
+    }, [error]);
+
+
+    const performSearch = (values: any) => {
+        const { origin, destination, date } = values;
+        const dateStr = date.format('YYYY-MM-DD');
+        setSearchQuery({ origin, destination, date: dateStr });
     };
 
     const onFinish = (values: any) => {
@@ -531,6 +525,13 @@ export default function FlightSearch({ mode = 'page' }: FlightSearchProps) {
 
                                         if (!res.ok) {
                                             const err = await res.json();
+                                            // Enhanced Error Handling for Concurrency/Locking
+                                            if (res.status === 503) {
+                                                throw new Error("High traffic detected. Please try confirming your booking again in a few seconds.");
+                                            }
+                                            if (res.status === 400 && err.detail?.toLowerCase().includes('capacity')) {
+                                                throw new Error("This flight no longer has enough capacity for your request. Please try a smaller weight or different flight.");
+                                            }
                                             throw new Error(err.detail || "Booking failed");
                                         }
 

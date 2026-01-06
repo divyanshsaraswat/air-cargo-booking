@@ -1,75 +1,96 @@
 'use client';
 
 import React, { useState, useEffect, Suspense } from 'react';
-import { Input, Button, Card, Typography, Empty, Alert, Row, Col } from 'antd';
+import { Input, Button, Card, Typography, Empty, Alert, Row, Col, Result } from 'antd';
 import { SearchOutlined } from '@ant-design/icons';
 import TrackingTimeline from '@/components/TrackingTimeline';
+import useSWR from 'swr';
 import { useSearchParams } from 'next/navigation';
 
 const { Title, Text } = Typography;
 
 function TrackingContent() {
     const [searchId, setSearchId] = useState('');
-    const [loading, setLoading] = useState(false);
-    const [trackingData, setTrackingData] = useState<any>(null);
-    const [error, setError] = useState('');
     const searchParams = useSearchParams();
 
+    // SWR Fetcher
+    const fetcher = async (url: string) => {
+        const res = await fetch(url);
+        if (!res.ok) {
+            if (res.status === 404) {
+                throw new Error('Booking ID not found. Please check and try again.');
+            } else {
+                throw new Error('Failed to fetch booking details.');
+            }
+        }
+        const data = await res.json();
+        console.log("Tracking Response:", data);
+
+        // Transform
+        return {
+            id: data.ref_id,
+            origin: data.origin,
+            destination: data.destination,
+            pieces: data.pieces,
+            weight: data.weight_kg,
+            currentStatus: data.status,
+            events: (data.events || []).map((e: any) => ({
+                status: e.status,
+                location: e.location || 'Unknown',
+                timestamp: new Date(e.timestamp).toLocaleString('en-IN', {
+                    timeZone: 'Asia/Kolkata',
+                    dateStyle: 'medium',
+                    timeStyle: 'short'
+                }) + ' (IST)',
+                description: (() => {
+                    if (e.metadata?.message) return e.metadata.message;
+                    if (e.status === 'DEPARTED') return `Departed from ${e.location}`;
+                    if (e.status === 'ARRIVED') return `Arrived at ${e.location}`;
+                    if (e.status === 'DELIVERED') return `Delivered at ${e.location}`;
+                    return `Status updated to ${e.status}`;
+                })()
+            }))
+        };
+    };
+
+    // Use SWR
+    // Only fetch if we have a searchId
+    const { data: trackingData, error, isLoading } = useSWR(
+        searchId ? `${process.env.NEXT_PUBLIC_API_URL}/bookings/${searchId}` : null,
+        fetcher,
+        {
+            revalidateOnFocus: false, // Don't revalidate just by clicking window
+            refreshInterval: 10000,   // Poll every 10 seconds for live updates
+            shouldRetryOnError: false // Don't retry 404s infinitely
+        }
+    );
+
+    // Initialize searchId from URL
     useEffect(() => {
         const id = searchParams.get('id');
         if (id) {
             setSearchId(id);
-            handleSearch(id);
         }
     }, [searchParams]);
 
-    const handleSearch = async (id?: string) => {
-        const queryId = id || searchId;
-        if (!queryId) return;
+    const handleSearch = (id?: string) => {
+        // Just setting the searchID triggers SWR
+        // If input changed, we update searchId. 
+        // Note: The input is bound to 'searchId' state directly in the original code.
+        // But if we type, we don't want to fetch on every keystroke. 
+        // We need a separate state for "Input Value" vs "Query Value".
+        // Let's fix that.
+    };
 
-        setLoading(true);
-        setError('');
-        setTrackingData(null);
+    // We need separate state for input to avoid fetching on every keystroke if the user is typing
+    const [inputValue, setInputValue] = useState('');
 
-        try {
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/bookings/${queryId}`);
+    useEffect(() => {
+        if (searchId) setInputValue(searchId);
+    }, [searchId]);
 
-            if (!res.ok) {
-                if (res.status === 404) {
-                    throw new Error('Booking ID not found. Please check and try again.');
-                } else {
-                    throw new Error('Failed to fetch booking details.');
-                }
-            }
-
-            const data = await res.json();
-
-            // Transform backend data to frontend structure
-            const mappedData = {
-                id: data.ref_id,
-                origin: data.origin,
-                destination: data.destination,
-                pieces: data.pieces,
-                weight: data.weight_kg,
-                currentStatus: data.status,
-                events: (data.events || []).map((e: any) => ({
-                    status: e.status,
-                    location: e.location || 'Unknown',
-                    timestamp: new Date(e.timestamp).toLocaleString('en-IN', {
-                        timeZone: 'Asia/Kolkata',
-                        dateStyle: 'medium',
-                        timeStyle: 'short'
-                    }) + ' (IST)',
-                    description: e.metadata?.message || `Status updated to ${e.status}`
-                }))
-            };
-
-            setTrackingData(mappedData);
-        } catch (err: any) {
-            setError(err.message || "An error occurred");
-        } finally {
-            setLoading(false);
-        }
+    const onSearchTrigger = () => {
+        setSearchId(inputValue);
     };
 
     return (
@@ -85,17 +106,32 @@ function TrackingContent() {
                         size="large"
                         placeholder="Enter Booking ID (e.g., BOOK-1234)"
                         prefix={<SearchOutlined />}
-                        value={searchId}
-                        onChange={(e) => setSearchId(e.target.value)}
-                        onPressEnter={() => handleSearch()}
+                        value={inputValue}
+                        onChange={(e) => setInputValue(e.target.value)}
+                        onPressEnter={onSearchTrigger}
                     />
-                    <Button type="primary" size="large" onClick={() => handleSearch()} loading={loading}>
+                    <Button type="primary" size="large" onClick={onSearchTrigger} loading={isLoading}>
                         Track
                     </Button>
                 </div>
             </Card>
 
-            {error && <Alert message={error} type="error" showIcon style={{ marginBottom: '24px' }} />}
+            {error ? (
+                <div style={{ animation: 'fadeIn 0.5s', marginBottom: '24px' }}>
+                    <Card variant="borderless" style={{ background: 'transparent' }}>
+                        <Result
+                            status={error.message?.includes('not found') ? "404" : "error"}
+                            title={error.message?.includes('not found') ? "No Booking Found" : "Error"}
+                            subTitle={error.message}
+                            extra={[
+                                <Button type="primary" key="search" onClick={() => { setSearchId(''); setInputValue(''); }}>
+                                    Try Another ID
+                                </Button>
+                            ]}
+                        />
+                    </Card>
+                </div>
+            ) : null}
 
             {trackingData ? (
                 <div style={{ animation: 'fadeIn 0.5s ease-in-out' }}>
@@ -131,7 +167,7 @@ function TrackingContent() {
                     <TrackingTimeline events={trackingData.events} currentStatus={trackingData.currentStatus} />
                 </div>
             ) : (
-                !loading && !error && (
+                !isLoading && !error && (
                     <Empty description="Enter a Tracking ID to see details" image={Empty.PRESENTED_IMAGE_SIMPLE} />
                 )
             )}

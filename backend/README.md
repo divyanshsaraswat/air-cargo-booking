@@ -94,6 +94,14 @@ Marks a booking as `ARRIVED`.
 **Parameters:**
 - `location` (string): The airport/location code.
 
+#### **Deliver Booking**
+`POST /bookings/{ref_id}/deliver`
+
+Marks a booking as `DELIVERED`.
+
+**Parameters:**
+- `location` (string): The delivery location/address.
+
 #### **Cancel Booking**
 `POST /bookings/{ref_id}/cancel`
 
