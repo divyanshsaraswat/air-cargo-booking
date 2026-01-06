@@ -29,7 +29,7 @@ export default function MainLayout({
     const headerRef = useRef<HTMLElement>(null);
     const navRef = useRef<HTMLDivElement>(null);
     const ctaRef = useRef<HTMLDivElement>(null);
-    const logoRef = useRef<HTMLDivElement>(null);
+    const logoContainerRef = useRef<HTMLDivElement>(null); // Renamed for clarity
     const logoTextRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -42,14 +42,12 @@ export default function MainLayout({
                 width: '230px', // Wider initial width to fit "Air Cargo"
                 height: '56px',
                 borderRadius: '50px',
-                padding: '0 10px',
+                // padding: '0 10px', // Not needed if children are absolute
                 justifyContent: 'space-between',
                 force3D: true
             });
 
             // Hide Nav and CTA initially using absolute positioning
-            // This removes them from flow, allowing Logo to be centered by flexbox/margins
-            // and allows us to "just animate opacity" as requested.
             gsap.set([navRef.current, ctaRef.current], {
                 autoAlpha: 0,
                 position: 'absolute',
@@ -70,10 +68,15 @@ export default function MainLayout({
                 right: '32px'
             });
 
-            // Ensure Logo + Text is centered initially using auto margins
-            gsap.set(logoRef.current, {
-                margin: '0 auto',
-                x: 0
+            // Position Logo ABSOLUTELY in the center initially
+            // This guarantees perfect centering regardless of other elements or flex logic
+            gsap.set(logoContainerRef.current, {
+                position: 'absolute',
+                top: '50%',
+                left: '50%',
+                xPercent: -50,
+                yPercent: -50,
+                margin: 0
             });
 
             // Ensure Logo Text is visible
@@ -96,15 +99,15 @@ export default function MainLayout({
                 .to(headerRef.current, {
                     width: 'calc(100% - 48px)',
                     maxWidth: '1200px',
-                    padding: '0 32px',
+                    // padding: '0 32px', // Padding doesn't affect absolute children
                     duration: 1.8,
                     ease: `elastic.out(1,0.3)`,
                 }, 'expand')
 
-                // Move logo to left (margin 0)
-                .to(logoRef.current, {
-                    marginLeft: 0,
-                    marginRight: 0,
+                // Move logo to the left (32px matches the design padding)
+                .to(logoContainerRef.current, {
+                    left: '32px',
+                    xPercent: 0,
                     duration: 1.5,
                     ease: 'power4.inOut'
                 }, 'expand')
@@ -188,16 +191,18 @@ export default function MainLayout({
                 }}
             >
                 {/* Logo Area */}
-                <Link href="/" style={{ textDecoration: 'none' }} passHref>
-                    <div ref={logoRef} className="logo" style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: '12px' }}>
-                        <div style={{ width: '32px', height: '32px', background: '#44449b', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 'bold', flexShrink: 0 }}>AC</div>
-                        <div ref={logoTextRef}>
-                            <Text strong className="logo-text" style={{ fontSize: '24px', fontFamily: 'sans-serif', color: isDarkMode ? 'white' : 'inherit', whiteSpace: 'nowrap' }}>
-                                Air Cargo
-                            </Text>
+                <div ref={logoContainerRef}>
+                    <Link href="/" style={{ textDecoration: 'none' }} passHref>
+                        <div className="logo" style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: '12px' }}>
+                            <div style={{ width: '32px', height: '32px', background: '#44449b', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 'bold', flexShrink: 0 }}>AC</div>
+                            <div ref={logoTextRef} style={{ display: 'flex', alignItems: 'center' }}>
+                                <Text strong className="logo-text" style={{ fontSize: '24px', fontFamily: 'sans-serif', color: isDarkMode ? 'white' : 'inherit', whiteSpace: 'nowrap', lineHeight: '1', margin: 0, position: 'relative', top: '2px' }}>
+                                    Air Cargo
+                                </Text>
+                            </div>
                         </div>
-                    </div>
-                </Link>
+                    </Link>
+                </div>
 
                 {/* Navigation - Menu Component (Desktop) */}
                 <div ref={navRef} className="responsive-nav" style={{ flex: 1, display: 'flex', justifyContent: 'center' }}>
