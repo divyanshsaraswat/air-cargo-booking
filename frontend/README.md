@@ -1,61 +1,71 @@
 # Air Cargo Booking Frontend
 
-A modern, responsive, and aesthetically pleasing frontend for the Air Cargo Booking System, built with Next.js and Ant Design.
+A premium, high-performance interface for the Air Cargo ecosystem, built with Next.js 14+ and Ant Design.
 
-## 🚀 Features
+## 🌟 Highlights
 
--   **Deep Indigo Theme**: A premium, professional aesthetic centered around a deep indigo color palette (`#343471ff`, `#44449b`) with a fully integrated specific **Dark Mode**.
--   **Responsive Design**: precise layouts for desktop, tablet, and mobile, including a custom **Hamburger Navigation Drawer** for smaller screens.
--   **Interactive Booking Form**: A multi-step form for creating bookings, featuring validation and simulated API responses.
--   **Real-time Tracking**: A dedicated tracking page that accepts Booking IDs via URL parameters (`?id=BOOK-123`) or manual input, displaying a timeline of shipment events.
--   **Authentication UI**: A clean, branded Login page with social login options (Apple, Google) and email/password inputs.
--   **Custom Theme Toggle**: A delightful, animated sun/moon toggle for switching between Light and Dark modes.
+-   **Deep Indigo Theme**: A custom-designed professional aesthetic with a built-in **Dark Mode**.
+-   **Smart Caching (SWR)**: 
+    -   **Instant Search**: Flight results are cached client-side for immediate navigation.
+    -   **Live Tracking**: The tracking page polls for updates every 10 seconds, providing real-time visibility without refreshing.
+-   **Responsive UX**: Fully adaptive layouts including a mobile-optimized Hamburger Drawer.
+-   **Robust Error Handling**: User-friendly feedback for complex scenarios like high traffic or capacity limits.
 
 ## 🛠️ Tech Stack
 
--   **Framework**: [Next.js 14+](https://nextjs.org/) (App Router)
--   **Language**: TypeScript
--   **Component Library**: [Ant Design (Antd)](https://ant.design/)
--   **Styling**: CSS Modules (with Tailwind for utilities), Antd Token System for theming.
--   **Icons**: `@ant-design/icons`
+-   **Core**: [Next.js 14+](https://nextjs.org/) (App Router), TypeScript.
+-   **UI Library**: [Ant Design](https://ant.design/), `gsap` (Animations).
+-   **Data Fetching**: `swr` (Stale-While-Revalidate).
+-   **Styling**: CSS Modules, Tailwind Utilities.
 
-## 📂 Project Structure
+## 📂 Key Dependencies
 
--   `app/`: App Router pages (`page.tsx`, `layout.tsx`, `globals.css`).
-    -   `booking/`: Booking page.
-    -   `tracking/`: Tracking page (dynamic search).
-    -   `login/`: Login interface.
--   `components/`: Reusable UI components.
-    -   `MainLayout.tsx`: The core wrapper with responsive Header, Drawer, and Footer.
-    -   `BookingForm.tsx`: The primary booking interface.
-    -   `TrackingTimeline.tsx`: Visual timeline for shipment status.
-    -   `ThemeToggle.tsx`: Custom animated dark mode switch.
-    -   `AntdRegistry.tsx`: Theme provider and token configuration.
+```json
+"dependencies": {
+  "antd": "^6.1.4",
+  "next": "16.1.1",
+  "swr": "^2.3.0",
+  "gsap": "^3.14.2"
+}
+```
 
-## 🏃‍♂️ Getting Started
+## 🚀 Getting Started
 
-1.  **Install Dependencies**:
+1.  **Install**:
     ```bash
     npm install
     # or
     yarn install
     ```
 
-2.  **Run Development Server**:
+2.  **Dev Server**:
     ```bash
     npm run dev
     ```
-    Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+    Visit `http://localhost:3000`.
 
-3.  **Build for Production**:
+3.  **Build**:
     ```bash
     npm run build
     npm start
     ```
 
-## 🎨 Design System
+## 🎨 Features
 
-The application uses a **Deep Indigo** primary color (`#44449b`) to convey trust and professionalism in logistics.
+### 1. Flight Search
+-   Interactive widget to search for routes.
+-   Displays direct and multi-leg flights.
+-   **Cached** results for instant backtracking.
 
--   **Light Mode**: Clean white backgrounds, sharp text, and elevation shadows.
--   **Dark Mode**: Deep grey/black backgrounds (`#1f1f1f`), white text, and specially styled dark inputs for visual comfort.
+### 2. Real-time Tracking
+-   Track any shipment via ID (e.g., `?id=BOOK-123`).
+-   **Live Polling** updates status automatically.
+-   Visual Timeline of events.
+
+### 3. Booking Management
+-   Secure multi-step booking form.
+-   Seamless integration with backend concurrency checks.
+
+### 4. Design System
+-   **Primary Color**: `#44449b` (Deep Indigo).
+-   **Visuals**: Glassmorphism cards, smooth GSAP transitions, clear typography.

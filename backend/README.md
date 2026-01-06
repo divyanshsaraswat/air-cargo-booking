@@ -1,8 +1,22 @@
 # GoComet Backend API
 
-This is the FastAPI backend for the Air Cargo Booking system. It provides endpoints for flight searching and booking management, backed by Supabase.
+A high-performance FastAPI backend for the Air Cargo Booking system, powered by Supabase and Redis.
 
-## Setup
+## 🚀 Key Features
+
+-   **Hybrid Concurrency Control**: Uses a smart hybrid locking strategy (Database Atomic Updates + Redis Distributed Locks) to handle high-concurrency flight bookings, ensuring zero overbooking even for the last few kg.
+-   **Intelligent Caching**: Implements Redis caching for flight search routes to deliver lightning-fast results.
+-   **Event-Driven Architecture**: bookings generate a trail of events (`BOOKED`, `DEPARTED`, `ARRIVED`, `DELIVERED`) for granular tracking.
+-   **Secure Authentication**: JWT-based user authentication.
+
+## 🛠️ Tech Stack
+
+-   **Framework**: FastAPI (Python)
+-   **Database**: Supabase (PostgreSQL)
+-   **Caching & Locking**: Upstash Redis (`upstash-redis`)
+-   **Package Manager**: `uv`
+
+## ⚡ Setup
 
 1.  **Install Dependencies**:
     ```bash
@@ -13,156 +27,56 @@ This is the FastAPI backend for the Air Cargo Booking system. It provides endpoi
     ```env
     SUPABASE_URL=your_supabase_url
     SUPABASE_KEY=your_supabase_key
+    SECRET_KEY=your_jwt_secret
+    UPSTASH_REDIS_REST_URL=your_redis_url
+    UPSTASH_REDIS_REST_TOKEN=your_redis_token
     ```
 3.  **Run Server**:
     ```bash
     uv run fastapi dev main.py
     ```
 
-## API Endpoints
+## 📖 API Documentation
 
-### ✈️ Flights
+### ✈️ Flight Routes
 
 #### **Search Routes**
 `GET /route`
-
-Finds flight options between two cities for a specific date. 
-- **Direct Flights**: Returns all direct flights.
-- **Transit Flights**: Returns 1-stop connections where the second leg departs on the **same day or the next day** relative to the first leg's arrival.
-
-**Parameters:**
-- `origin` (string): IATA code or city name.
-- `destination` (string): IATA code or city name.
-- `date` (date): Departure date (YYYY-MM-DD).
-
-**Response:** `List[List[Flight]]`
-A list of routes. Each route is a list of flight segments (1 for direct, 2 for transit).
+-   **Goal**: Find direct or 1-stop connections between cities.
+-   **Performance**: Results are **Cached in Redis** for 5 minutes (TTL 300s).
+-   **Params**: `origin`, `destination`, `date` (YYYY-MM-DD).
 
 ---
 
-### 📦 Bookings
+### 📦 Booking Management
 
 #### **Create Booking**
 `POST /bookings`
+-   **Goal**: Create a shipment booking.
+-   **Concurrency**: 
+    -   If flight capacity > 100kg: Fast `UPDATE`.
+    -   If flight capacity <= 100kg: **Redis Lock (5s TTL)** is acquired to prevent race conditions.
+-   **Body**:
+    ```json
+    { "origin": "DEL", "destination": "LHR", "weight_kg": 500, "pieces": 10, "flight_ids": ["..."] }
+    ```
 
-Creates a new shipment booking and initializes its status to `BOOKED`.
-
-**Body:**
-```json
-{
-  "ref_id": "unique-human-readable-id",
-  "origin": "DEL",
-  "destination": "NYC",
-  "pieces": 10,
-  "weight_kg": 500,
-  "flight_ids": ["fl_123"]
-}
-```
-
-#### **Get Booking & History**
+#### **Get Booking Status**
 `GET /bookings/{ref_id}`
+-   Retrieves current status and full event timeline.
 
-Retrieves the current state of a booking along with its full event timeline.
-
-**Response:**
-```json
-{
-  "ref_id": "...",
-  "status": "ARRIVED",
-  ...
-  "events": [
-    { "status": "BOOKED", "timestamp": "...", "metadata": {...} },
-    { "status": "DEPARTED", "timestamp": "...", "location": "DEL" }
-  ]
-}
-```
-
-#### **Depart Booking**
+#### **Depart Shipment**
 `POST /bookings/{ref_id}/depart`
+-   Updates status to `DEPARTED`. Requires `location`.
 
-Marks a booking as `DEPARTED`.
-
-**Parameters:**
-- `location` (string): The airport/location code.
-- `flight_id` (string, optional): The flight ID being boarded.
-
-#### **Arrive Booking**
+#### **Arrive Shipment**
 `POST /bookings/{ref_id}/arrive`
+-   Updates status to `ARRIVED`. Requires `location`.
 
-Marks a booking as `ARRIVED`.
-
-**Parameters:**
-- `location` (string): The airport/location code.
-
-#### **Deliver Booking**
+#### **Deliver Shipment**
 `POST /bookings/{ref_id}/deliver`
-
-Marks a booking as `DELIVERED`.
-
-**Parameters:**
-- `location` (string): The delivery location/address.
+-   Updates status to `DELIVERED`. Requires `location`.
 
 #### **Cancel Booking**
 `POST /bookings/{ref_id}/cancel`
-
-Marks a booking as `CANCELLED`.
-- **Restriction**: Cannot cancel a booking that has already `ARRIVED` or been `DELIVERED`.
-
----
-
-## Data Models
-
-### Booking Status
-- `BOOKED`: Initial state.
-- `DEPARTED`: Shipment has left a location.
-- `ARRIVED`: Shipment has arrived at a location.
-- `DELIVERED`: Final delivery complete.
-- `CANCELLED`: Shipment cancelled.
-
-## 👤 User Management
-
-### **Signup**
-`POST /users/signup`
-
-Registers a new user with a secure password hash.
-
-**Body:**
-```json
-{
-  "email": "user@example.com",
-  "password": "securepassword",
-  "name": "John Doe",
-  "dob": "1990-01-01"
-}
-```
-
-**Response:**
-Returns the created user object (excluding password).
-
-### **Login**
-`POST /users/login`
-
-Verifies credentials and logs the user in.
-
-**Body:**
-```json
-{
-  "email": "user@example.com",
-  "password": "securepassword"
-}
-```
-
-**Response:**
-Returns a success message and user details.
-
----
-
-## Data Models
-
-### User
-- `id`: UUID
-- `email`: String (Unique)
-- `name`: String
-- `dob`: Date
-- `created_at`: Datetime
-
+-   Marks as `CANCELLED`. Allowed only before arrival/delivery.
