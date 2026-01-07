@@ -1,71 +1,93 @@
 # Air Cargo Booking Frontend
 
-A premium, high-performance interface for the Air Cargo ecosystem, built with Next.js 14+ and Ant Design.
+A premium, high-performance interface for the Air Cargo ecosystem, built with Next.js 15 (App Router) and Ant Design. It focuses on a responsive, professional user experience ("Deep Indigo" theme) with real-time capabilities.
 
-## 🌟 Highlights
+---
 
--   **Deep Indigo Theme**: A custom-designed professional aesthetic with a built-in **Dark Mode**.
--   **Smart Caching (SWR)**: 
-    -   **Instant Search**: Flight results are cached client-side for immediate navigation.
-    -   **Live Tracking**: The tracking page polls for updates every 10 seconds, providing real-time visibility without refreshing.
--   **Responsive UX**: Fully adaptive layouts including a mobile-optimized Hamburger Drawer.
--   **Robust Error Handling**: User-friendly feedback for complex scenarios like high traffic or capacity limits.
+## 🌟 Key Highlights
 
-## 🛠️ Tech Stack
+### **1. Modern Tech Stack**
+-   **Next.js 15**: Leveraging the latest App Router for server-side rendering and efficient routing.
+-   **Ant Design (v5)**: A comprehensive UI library providing accessible, high-quality components (Drawers, Forms, Timelines).
+-   **TailwindCSS**: Used for layout utility and custom design tokens.
 
--   **Core**: [Next.js 14+](https://nextjs.org/) (App Router), TypeScript.
--   **UI Library**: [Ant Design](https://ant.design/), `gsap` (Animations).
--   **Data Fetching**: `swr` (Stale-While-Revalidate).
--   **Styling**: CSS Modules, Tailwind Utilities.
+### **2. Smart Data Handling (SWR)**
+-   **Stale-While-Revalidate**: We use `swr` for all data fetching.
+-   **Instant Feedback**: Flight search results are cached client-side. Backtracking to search results is instantaneous.
+-   **Live Polling**: The tracking interface polls the API every 10 seconds to auto-update shipment status without page reloads.
 
-## 📂 Key Dependencies
+### **3. Premium UX/UI**
+-   **Theme**: Custom "Deep Indigo" (`#44449b`) branding with glassmorphism effects.
+-   **Dark Mode**: Fully supported via Tailwind's `dark:` modifiers.
+-   **Animations**: GSAP is used for smooth entry transitions and timeline animations.
+-   **Responsive**: Mobile-first design with adaptive layouts (e.g., Drawers on mobile vs Modals on desktop).
 
-```json
-"dependencies": {
-  "antd": "^6.1.4",
-  "next": "16.1.1",
-  "swr": "^2.3.0",
-  "gsap": "^3.14.2"
-}
-```
+---
 
-## 🚀 Getting Started
+## 📂 Project Structure
 
-1.  **Install**:
+-   `app/`: Next.js App Router directory.
+    -   `page.tsx`: Home page with Search Widget.
+    -   `tracking/`: dedicated tracking page with timeline visualization.
+    -   `layout.tsx`: Root layout defining the global `MainLayout` shell.
+-   `components/`: Reusable UI modules.
+    -   `FlightSearch.tsx`: Complex form logic, API integration, and result rendering.
+    -   `TrackingTimeline.tsx`: Ant Design `Steps` component adapted for shipment events.
+    -   `MainLayout.tsx`: Responsive navigation bar and footer.
+-   `theme/`: Design tokens and global CSS (`globals.css`).
+
+---
+
+## ⚡ Setup & Installation
+
+### Prerequisites
+-   Node.js 18+
+-   npm or yarn
+
+### Steps
+
+1.  **Install Dependencies**:
     ```bash
     npm install
-    # or
-    yarn install
     ```
 
-2.  **Dev Server**:
+2.  **Environment Setup**:
+    Create a `.env` file in the `frontend/` root:
+    ```env
+    NEXT_PUBLIC_API_URL=http://localhost:8000
+    AUTH_SECRET=your_nextauth_secret
+    ```
+
+3.  **Run Development Server**:
     ```bash
     npm run dev
     ```
-    Visit `http://localhost:3000`.
+    The app will be live at `http://localhost:3000`.
 
-3.  **Build**:
+4.  **Production Build**:
     ```bash
     npm run build
     npm start
     ```
 
-## 🎨 Features
+---
 
-### 1. Flight Search
--   Interactive widget to search for routes.
--   Displays direct and multi-leg flights.
--   **Cached** results for instant backtracking.
+## 🎨 Features & Flows
 
-### 2. Real-time Tracking
--   Track any shipment via ID (e.g., `?id=BOOK-123`).
--   **Live Polling** updates status automatically.
--   Visual Timeline of events.
+### **1. Intelligent Flight Search**
+-   Users can search for flights between global hubs (e.g., DEL -> LHR).
+-   **Validation**: Prevents invalid dates or same-origin-destination searches.
+-   **Results**: Displays direct flights and transit options with clear pricing and duration metrics.
 
-### 3. Booking Management
--   Secure multi-step booking form.
--   Seamless integration with backend concurrency checks.
+### **2. Booking Experience**
+-   **Review Drawer**: Instead of navigating away, a contextual drawer opens to review flight details and input cargo specifics.
+-   **Real-time Feedback**: Loading states and specific error messages (e.g., "Not enough capacity") directly from the backend.
 
-### 4. Design System
--   **Primary Color**: `#44449b` (Deep Indigo).
--   **Visuals**: Glassmorphism cards, smooth GSAP transitions, clear typography.
+### **3. Shipment Tracking**
+-   **Route**: `/tracking?id=BOOK-REF`
+-   **visuals**: A vertical timeline showing the exact status of the shipment (`BOOKED` -> `DEPARTED` -> `ARRIVED` -> `DELIVERED`).
+-   **Auto-Refresh**: Operators can leave this page open on a dashboard screen; it will update automatically as backend events occur.
+
+### **4. Authentication**
+-   Integrated with **NextAuth.js** for secure, session-based user management.
+-   Protected routes verify session validity before rendering sensitive booking information.
