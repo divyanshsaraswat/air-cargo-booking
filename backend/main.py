@@ -330,7 +330,7 @@ def get_route(origin: str, destination: str, date: date):
         # Max departure is End of Next Day relative to First Leg DEPARTURE
         
         dep_date = first_leg.departure_datetime.date()
-        max_dep_2nd = datetime.combine(dep_date + timedelta(days=1), datetime.max.time())
+        max_dep_2nd = datetime.combine(dep_date + timedelta(days=1), datetime.max.time()).replace(tzinfo=timezone.utc)
 
         # If arrival is already after the max window (e.g. very long flight), no connection possible
         if min_dep_2nd > max_dep_2nd:

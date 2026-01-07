@@ -4,7 +4,17 @@ A next-generation logistics platform designed for reliability, speed, and user e
 
 ---
 
-## �️ HLD & Code Structure
+## 🎥 Demo
+
+### **Walkthrough Video**
+[Upload your walkthrough video here]
+
+### **Architecture Diagrams**
+[Upload your HLD/LLD diagrams here]
+
+---
+
+## 🏗️ HLD & Code Structure
 
 The project follows a **Microservices-ready Monolithic** architecture, separating concerns between client interaction and business logic.
 

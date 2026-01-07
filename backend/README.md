@@ -86,28 +86,110 @@ To solve the classic "Double Booking" problem without sacrificing performance:
 
 ## 📖 API Documentation
 
-### ✈️ Flights & Routing
-#### `GET /route`
--   **Description**: Finds the best flights (Direct & 1-Stop) between two cities.
--   **Parameters**: `origin`, `destination`, `date`.
--   **Optimization**: Hits Redis Cache first; falls back to Supabase if cache miss.
-
-### 📦 Bookings
-#### `POST /bookings`
--   **Description**: Creates a new shipment booking.
--   **Security**: Requires Bearer Token.
--   **Logic**: Checks flight capacity -> Acquires Lock (if needed) -> Updates Flight Weight -> Inserts Booking -> Inserts 'BOOKED' Event.
-
-#### `GET /bookings/{ref_id}`
--   **Description**: Returns booking details + full history timeline.
-
-#### `POST /bookings/{ref_id}/[cancel|depart|arrive|deliver]`
--   **Description**: Lifecycle state management endpoints.
--   **Validation**: Enforces state machine rules (e.g., cannot cancel a delivered shipment).
-
 ### 👤 Authentication
+
 #### `POST /users/signup`
--   Registers a new user and returns a JWT.
+**Description**: Register a new user.
+- **Request Body**:
+  ```json
+  {
+    "email": "user@example.com",
+    "password": "strongpassword",
+    "name": "John Doe",
+    "dob": "1990-01-01"
+  }
+  ```
+- **Response**: `200 OK`
+  ```json
+  {
+    "access_token": "eyJhbGciOi...",
+    "token_type": "bearer",
+    "user": { "id": "uuid", "email": "...", "name": "..." }
+  }
+  ```
 
 #### `POST /users/login`
--   Authenticates credentials and issues a JWT.
+**Description**: Authenticate and get a JWT token.
+- **Request Body**:
+  ```json
+  {
+    "email": "user@example.com",
+    "password": "strongpassword"
+  }
+  ```
+- **Response**: Same as signup.
+
+---
+
+### ✈️ Flights & Routing
+
+#### `GET /route`
+**Description**: Search for flights between two airports. Returns direct and 1-stop options.
+- **Query Parameters**:
+  - `origin` (e.g., `DEL`)
+  - `destination` (e.g., `LHR`)
+  - `date` (YYYY-MM-DD)
+- **Response**: Array of Route objects.
+  ```json
+  [
+    [
+      {
+        "flight_id": "uuid",
+        "flight_number": "BA143",
+        "airline_name": "British Airways",
+        "origin": "DEL",
+        "destination": "LHR",
+        "departure_datetime": "2024-03-20T10:00:00",
+        "arrival_datetime": "2024-03-20T14:30:00",
+        "base_price_per_kg": 12.5,
+        "max_weight_kg": 5000,
+        "booked_weight_kg": 1200
+      }
+    ]
+  ]
+  ```
+
+---
+
+### 📦 Bookings
+
+#### `POST /bookings`
+**Description**: Create a new shipment booking.
+- **Headers**: `Authorization: Bearer <token>`
+- **Request Body**:
+  ```json
+  {
+    "ref_id": "BKG-12345",
+    "origin": "DEL",
+    "destination": "LHR",
+    "pieces": 5,
+    "weight_kg": 150,
+    "flight_ids": ["uuid-flight-1", "uuid-flight-2"]
+  }
+  ```
+- **Response**:
+  ```json
+  {
+    "ref_id": "BKG-12345",
+    "status": "BOOKED",
+    "created_at": "..."
+  }
+  ```
+
+#### `GET /bookings/my-bookings`
+**Description**: Get all bookings for the current user.
+- **Headers**: `Authorization: Bearer <token>`
+
+#### `GET /bookings/{ref_id}`
+**Description**: Get booking details and tracking timeline.
+
+#### `POST /bookings/{ref_id}/{action}`
+**Description**: Update booking lifecycle state.
+- **Actions**: `depart`, `arrive`, `deliver`, `cancel`
+- **Request Body** (optional, e.g., for `depart`):
+  ```json
+  {
+    "location": "LHR",
+    "flight_id": "uuid-flight-1" 
+  }
+  ```
