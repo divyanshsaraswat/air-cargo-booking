@@ -18,7 +18,6 @@ export default function SignupPage() {
         console.log('Signup values:', values);
 
         try {
-            // Convert moment/dayjs object to YYYY-MM-DD string
             const formattedValues = {
                 ...values,
                 dob: values.dob ? values.dob.format('YYYY-MM-DD') : null

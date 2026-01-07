@@ -58,9 +58,7 @@ const authOptions: NextAuthOptions = {
             return true;
         },
         async jwt({ token, user, account, profile }) {
-            // Initial sign in from Provider (e.g. Google) or Credentials
             if (account) {
-                // If it's Google, we need to sync with backend
                 if (account.provider === 'google') {
                     const googleId = account.providerAccountId;
                     const email = user.email;
@@ -102,17 +100,17 @@ const authOptions: NextAuthOptions = {
 
                         if (backendResponse) {
                             token.id = backendResponse.user.id;
-                            token.accessToken = backendResponse.access_token; // Store token
+                            token.accessToken = backendResponse.access_token;
                         }
                     } catch (e) {
                         console.error("Error syncing google user with backend", e);
                     }
                 } else {
-                    // Credentials provider
+
                     if (user) {
                         token.id = user.id;
                         // @ts-ignore
-                        token.accessToken = user.accessToken; // Store token from authorize return
+                        token.accessToken = user.accessToken;
                     }
                 }
             }
@@ -121,7 +119,7 @@ const authOptions: NextAuthOptions = {
         async session({ session, token }) {
             if (session.user) {
                 if (token.id) {
-                    // @ts-ignore
+                    
                     session.user.id = token.id as string;
                 }
                 if (token.accessToken) {

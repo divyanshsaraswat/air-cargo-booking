@@ -10,7 +10,7 @@ import { useSearchParams, useRouter } from 'next/navigation';
 const { Title, Text } = Typography;
 
 function LoginForm() {
-    const router = useRouter(); // Import this
+    const router = useRouter(); 
     const searchParams = useSearchParams();
     const callbackUrl = searchParams.get('callbackUrl') || '/';
     const [loading, setLoading] = useState(false);
@@ -38,7 +38,6 @@ function LoginForm() {
             display: 'flex',
             justifyContent: 'center',
             alignItems: 'center',
-            // background: consistent with Theme (handled by MainLayout)
             padding: '24px'
         }}>
             <div style={{ width: '100%', maxWidth: '440px' }}>

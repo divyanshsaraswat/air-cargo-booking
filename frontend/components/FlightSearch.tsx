@@ -121,15 +121,16 @@ export default function FlightSearch({ mode = 'page' }: FlightSearchProps) {
     }, [mode, searchParams, form]);
 
     // Restore pending booking if user just logged in
+    // Restore pending booking if user just logged in
     useEffect(() => {
         if (session) {
-            const pendingFlight = localStorage.getItem('pendingBookingFlight');
-            if (pendingFlight) {
+            const pendingRoute = localStorage.getItem('pendingBookingRoute');
+            if (pendingRoute) {
                 try {
-                    const flightData = JSON.parse(pendingFlight);
-                    // Verify it's valid flight data simply
-                    if (flightData && flightData.id) {
-                        setSelectedFlight(flightData);
+                    const routeData = JSON.parse(pendingRoute);
+                    // Verify it's valid route data
+                    if (routeData && routeData.flights && routeData.flights.length > 0) {
+                        setSelectedRoute(routeData);
                         setReviewOpen(true);
                         // Optional: Show a message "Resuming your booking..."
                         message.success("Resuming your booking", 2);
@@ -138,7 +139,7 @@ export default function FlightSearch({ mode = 'page' }: FlightSearchProps) {
                     console.error("Failed to parse pending booking", e);
                 } finally {
                     // Clear it so it doesn't open next time unnecessarily
-                    localStorage.removeItem('pendingBookingFlight');
+                    localStorage.removeItem('pendingBookingRoute');
                 }
             }
         }
@@ -223,7 +224,7 @@ export default function FlightSearch({ mode = 'page' }: FlightSearchProps) {
             }
 
             return {
-                type: mappedFlights.length > 1 ? 'transit' : 'direct',
+                type: (mappedFlights.length > 1 ? 'transit' : 'direct') as 'transit' | 'direct',
                 flights: mappedFlights,
                 totalPrice: parseFloat(totalPrice.toFixed(2)),
                 totalDuration: totalDurationStr
@@ -283,10 +284,10 @@ export default function FlightSearch({ mode = 'page' }: FlightSearchProps) {
     };
 
     const [reviewOpen, setReviewOpen] = useState(false);
-    const [selectedFlight, setSelectedFlight] = useState<Flight | null>(null);
+    const [selectedRoute, setSelectedRoute] = useState<Route | null>(null);
 
-    const onBookClick = (flight: Flight) => {
-        setSelectedFlight(flight);
+    const onBookClick = (route: Route) => {
+        setSelectedRoute(route);
         setReviewOpen(true);
     };
 
@@ -375,11 +376,7 @@ export default function FlightSearch({ mode = 'page' }: FlightSearchProps) {
                                             <div style={{ marginTop: '8px' }}>
                                                 <Button
                                                     type="primary"
-                                                    onClick={() => onBookClick(item.flights[0])} // Simplified: selecting first leg for "Book Now" context if transit, or pass full route later. For now passed single flight or better pass route.
-                                                // Correction: User wants to review the flight. If it's transit, we should probably show all details.
-                                                // For MVP simplicity and keeping types clean, I'll pass the first flight for "origin/dest/date" prefill, 
-                                                // but conceptually we might want to pass the whole route.
-                                                // Let's pass item.flights[0] for basic info for now as per previous logic.
+                                                    onClick={() => onBookClick(item)}
                                                 >
                                                     Book Now
                                                 </Button>
@@ -417,57 +414,56 @@ export default function FlightSearch({ mode = 'page' }: FlightSearchProps) {
                 styles={{ body: { paddingBottom: 80 }, wrapper: { width: 500 } }}
                 zIndex={100000000}
             >
-                {selectedFlight && (
+                {selectedRoute && (
                     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
                         {/* Header Info */}
                         <div style={{ marginBottom: 24 }}>
                             <Title level={4} style={{ margin: 0 }}>
-                                {AIRPORTS.find(a => a.code === selectedFlight.origin)?.name?.split('(')[0].trim() || selectedFlight.origin}
+                                {AIRPORTS.find(a => a.code === selectedRoute.flights[0].origin)?.name?.split('(')[0].trim() || selectedRoute.flights[0].origin}
                                 <ArrowRightOutlined style={{ fontSize: '16px', margin: '0 12px', color: '#888' }} />
-                                {AIRPORTS.find(a => a.code === selectedFlight.destination)?.name?.split('(')[0].trim() || selectedFlight.destination}
+                                {AIRPORTS.find(a => a.code === selectedRoute.flights[selectedRoute.flights.length - 1].destination)?.name?.split('(')[0].trim() || selectedRoute.flights[selectedRoute.flights.length - 1].destination}
                             </Title>
-                            <Text type="secondary">{dayjs(selectedFlight.date).format('ddd, DD MMM')} • Non-stop • {selectedFlight.duration} • Economy</Text>
+                            <Text type="secondary">
+                                {dayjs(selectedRoute.flights[0].date).format('ddd, DD MMM')} • {selectedRoute.type === 'transit' ? `${Math.max(0, selectedRoute.flights.length - 1)} Stops` : 'Non-stop'} • {selectedRoute.totalDuration} • Economy
+                            </Text>
                         </div>
 
-                        {/* Flight Details Card */}
-                        <Card style={{ background: '#fafafa', borderRadius: '12px', border: 'none', marginBottom: 24 }}>
-                            <div style={{ display: 'flex', alignItems: 'center', marginBottom: 20 }}>
-                                {/* Mock Logo */}
-                                <div style={{ width: 32, height: 32, background: '#002147', borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 'bold', marginRight: 12 }}>
-                                    {selectedFlight.airline.substring(0, 2).toUpperCase()}
+                        {/* Flight Details - Compact List */}
+                        <div style={{ marginBottom: 24, padding: '12px', background: '#f5f5f5', borderRadius: '8px' }}>
+                            {selectedRoute.flights.map((flight, index) => (
+                                <div key={flight.id}>
+                                    {index > 0 && (
+                                        <Divider style={{ margin: '12px 0', borderColor: '#d9d9d9', borderStyle: 'dashed' }}>
+                                            <span style={{ fontSize: '12px', color: '#888' }}>
+                                                Layover in {flight.origin}
+                                            </span>
+                                        </Divider>
+                                    )}
+                                    <div className="flight-segment-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <div className="flight-segment-info">
+                                            <div style={{ fontWeight: 600, fontSize: '14px' }}>
+                                                {flight.airline} <Text type="secondary" style={{ fontSize: '12px' }}>{flight.flightNumber}</Text>
+                                            </div>
+                                            <div style={{ fontSize: '13px' }}>{dayjs(flight.date).format('MMM DD')}</div>
+                                            <div style={{ color: '#555', fontSize: '13px' }}>
+                                                {flight.origin} ({flight.departureTime} IST)
+                                                <SearchOutlined rotate={90} style={{ fontSize: '10px', margin: '0 6px' }} />
+                                                {flight.destination} ({flight.arrivalTime} IST)
+                                            </div>
+                                        </div>
+                                        <div style={{ fontWeight: 500, fontSize: '13px' }}>{flight.duration}</div>
+                                    </div>
                                 </div>
-                                <Text strong>{selectedFlight.airline} • {selectedFlight.flightNumber}</Text>
-                            </div>
+                            ))}
+                        </div>
 
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                                <div>
-                                    <Title level={3} style={{ margin: 0 }}>{selectedFlight.departureTime} IST</Title>
-                                    <Text>{selectedFlight.origin}</Text>
-                                    <div style={{ fontSize: 12, color: '#888' }}>{AIRPORTS.find(a => a.code === selectedFlight.origin)?.name}</div>
-                                </div>
-                                <div style={{ flex: 1, textAlign: 'center', padding: '0 16px' }}>
-                                    <Text type="secondary" style={{ fontSize: 12 }}>{selectedFlight.duration}</Text>
-                                    <div style={{ borderTop: '1px dashed #ccc', margin: '4px 0' }}></div>
-                                </div>
-                                <div style={{ textAlign: 'right' }}>
-                                    {/* Use pre-calculated arrival time */}
-                                    <Title level={3} style={{ margin: 0 }}>
-                                        {selectedFlight.arrivalTime ? `${selectedFlight.arrivalTime} IST` :
-                                            dayjs(`${selectedFlight.date} ${selectedFlight.departureTime}`).add(parseInt(selectedFlight.duration), 'hour').format('HH:mm') + ' IST'}
-                                    </Title>
-                                    <Text>{selectedFlight.destination}</Text>
-                                    <div style={{ fontSize: 12, color: '#888' }}>{AIRPORTS.find(a => a.code === selectedFlight.destination)?.name}</div>
-                                </div>
-                            </div>
-                        </Card>
-
-                        {/* Baggage Info */}
+                        {/* Baggage Info - Calculated from first flight for now as usually consistent, or show all? showing first for simplicity */}
                         <div style={{ marginBottom: 24 }}>
                             <div style={{ display: 'flex', gap: 12, marginBottom: 12 }}>
-                                <Text strong>📦 Max Capacity :</Text> <Text>{selectedFlight.maxWeight} kg</Text>
+                                <Text strong>📦 Max Capacity :</Text> <Text>{selectedRoute.flights[0].maxWeight} kg</Text>
                             </div>
                             <div style={{ display: 'flex', gap: 12 }}>
-                                <Text strong>💲 Base Rate :</Text> <Text>${selectedFlight.basePrice} / kg</Text>
+                                <Text strong>💲 Base Rate :</Text> <Text>${selectedRoute.totalPrice} / kg (Total)</Text>
                             </div>
                         </div>
 
@@ -483,7 +479,7 @@ export default function FlightSearch({ mode = 'page' }: FlightSearchProps) {
                                 onFinish={async (values) => {
                                     if (!session) {
                                         // Store current flight details to local storage
-                                        localStorage.setItem('pendingBookingFlight', JSON.stringify(selectedFlight));
+                                        localStorage.setItem('pendingBookingRoute', JSON.stringify(selectedRoute));
 
                                         message.loading("Redirecting to Login...", 1.5)
                                             .then(() => {
@@ -502,14 +498,12 @@ export default function FlightSearch({ mode = 'page' }: FlightSearchProps) {
                                         const payload = {
                                             ref_id: `BKG-${Math.random().toString(36).substr(2, 9).toUpperCase()}`,
                                             user_id: userId,
-                                            origin: selectedFlight.origin,
-                                            destination: selectedFlight.destination,
+                                            origin: selectedRoute.flights[0].origin,
+                                            destination: selectedRoute.flights[selectedRoute.flights.length - 1].destination,
                                             pieces: values.pieces,
                                             weight_kg: values.weight,
-                                            // Ideally we should pass flight_ids if we have them. 
-                                            // selectedFlight.id is from frontend generation, might not match backend unless search was real.
-                                            // But let's pass it if it looks like a real ID or leave empty.
-                                            flight_ids: [selectedFlight.id]
+                                            // Pass all flight IDs
+                                            flight_ids: selectedRoute.flights.map(f => f.id)
                                         };
 
                                         console.log("Booking Payload:", payload);
@@ -572,18 +566,18 @@ export default function FlightSearch({ mode = 'page' }: FlightSearchProps) {
                                 {/* Price Summary */}
                                 <div style={{ background: '#f9f9f9', padding: '16px', borderRadius: '8px', marginBottom: '24px' }}>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                                        <Text>Subtotal ({selectedFlight.basePrice} x <PriceCalculator form={drawerForm} /> kg)</Text>
-                                        <Text strong><SubtotalDisplay form={drawerForm} basePrice={selectedFlight.basePrice} /></Text>
+                                        <Text>Subtotal ({selectedRoute.totalPrice} x <PriceCalculator form={drawerForm} /> kg)</Text>
+                                        <Text strong><SubtotalDisplay form={drawerForm} basePrice={selectedRoute.totalPrice} /></Text>
                                     </div>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
                                         <Text>Tax (18%)</Text>
-                                        <Text strong><TaxDisplay form={drawerForm} basePrice={selectedFlight.basePrice} /></Text>
+                                        <Text strong><TaxDisplay form={drawerForm} basePrice={selectedRoute.totalPrice} /></Text>
                                     </div>
                                     <Divider style={{ margin: '12px 0' }} />
                                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                                         <Text strong style={{ fontSize: '16px' }}>Total Payable</Text>
                                         <Text strong style={{ fontSize: '18px', color: '#faad14' }}>
-                                            <TotalDisplay form={drawerForm} basePrice={selectedFlight.basePrice} />
+                                            <TotalDisplay form={drawerForm} basePrice={selectedRoute.totalPrice} />
                                         </Text>
                                     </div>
                                 </div>

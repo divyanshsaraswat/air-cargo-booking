@@ -36,9 +36,6 @@ body {
 
   .responsive-nav {
     display: none !important;
-    /* For now, hide nav text links on mobile to save space, or use a mobile menu */
-    /* Alternatively, keep them but smaller */
-    /* display: flex; gap: 16px !important; width: 100%; justify-content: center; */
   }
 
   .hero-title {
@@ -64,7 +61,6 @@ body {
     width: 100%;
   }
 
-  /* Logo adjustment */
   .logo-text {
     font-size: 20px !important;
   }
@@ -73,15 +69,8 @@ body {
     display: block !important;
     cursor: pointer;
     font-size: 24px;
-    /* color inherited or set explicitly if needed */
   }
 
-  /* Hide CTA on mobile header if we move it to menu, or keep it? User said "get started button too". 
-     So seemingly move it to menu or duplicate? 
-     Usually duplications or hiding desktop one.
-     Let's hide the desktop CTA container on mobile.
-     The desktop CTA is in a Space.
-  */
   .desktop-cta {
     display: none !important;
   }
@@ -109,14 +98,13 @@ body {
   }
 }
 
-/* Ant Design Message & Notification Z-Index Override */
+
 .ant-message,
 .ant-notification,
 .ant-notification-notice {
   z-index: 100000001 !important;
 }
 
-/* Flight Search Responsive Styles */
 .search-container {
   padding: 40px 0;
   max-width: 1000px;
@@ -181,15 +169,12 @@ body {
     flex-wrap: wrap;
     gap: 8px;
     font-size: 13px;
-    /* Slightly smaller text */
   }
 }
 
-/* Custom Menu Underline Color and Thickness */
+
 .ant-menu-horizontal>.ant-menu-item-selected::after,
 .ant-menu-horizontal>.ant-menu-item:hover::after {
   border-bottom-color: #1f187b !important;
-  /* Dark Blue/Black for visibility */
   border-bottom-width: 3px !important;
-  /* Thicker line */
 }

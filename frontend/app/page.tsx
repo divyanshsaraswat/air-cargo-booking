@@ -20,7 +20,6 @@ export default function Home() {
       {/* Hero Section */}
       <div className="hero-container" style={{
         textAlign: 'center',
-        // padding handled by CSS
         maxWidth: '1200px',
         margin: '0 auto',
         position: 'relative',
@@ -31,7 +30,6 @@ export default function Home() {
           level={1}
           className="hero-title"
           style={{
-            // fontSize handled by CSS
             fontWeight: 800,
             lineHeight: 1.1,
             marginBottom: '24px',

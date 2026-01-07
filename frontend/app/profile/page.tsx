@@ -66,12 +66,12 @@ export default function ProfilePage() {
         return null;
     }
 
-    // Determine values to display
+
     const user = session?.user;
     const displayName = user?.name || 'User Name';
     const displayEmail = user?.email || 'user@example.com';
 
-    // Simulated values based on schema request
+
     const simulatedDob = '2000-01-01';
     const simulatedCreatedAt = new Date().toLocaleDateString();
 
@@ -99,7 +99,7 @@ export default function ProfilePage() {
                     </div>
                 </Card>
 
-                {/* Details Card */}
+
                 <Card title="Personal Information" bordered={false} style={{ borderRadius: '16px', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
                     <Descriptions column={{ xxl: 1, xl: 1, lg: 1, md: 1, sm: 1, xs: 1 }} size="middle" bordered>
                         <Descriptions.Item label={<Space><UserOutlined /> Name</Space>}>
@@ -124,7 +124,7 @@ export default function ProfilePage() {
                     </Descriptions>
                 </Card>
 
-                {/* Your Bookings Section */}
+
                 <Card title="Your Bookings" bordered={false} style={{ borderRadius: '16px', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
                     {loadingBookings ? (
                         <div style={{ textAlign: 'center', padding: '20px' }}><Spin /></div>
@@ -163,7 +163,7 @@ export default function ProfilePage() {
                 </Card>
             </div>
 
-            {/* Booking Details Drawer */}
+
             <Drawer
                 title="Booking Details"
                 placement="right"
@@ -185,7 +185,7 @@ export default function ProfilePage() {
 
                         <Divider />
 
-                        {/* Flight Info Card */}
+
                         <Card title="Cargo Information" size="small" style={{ background: '#fafafa', marginBottom: 24 }}>
                             <Descriptions column={1} size="small">
                                 <Descriptions.Item label="Weight">{selectedBooking.weight_kg} kg</Descriptions.Item>
@@ -206,7 +206,7 @@ export default function ProfilePage() {
     );
 }
 
-// Helper component for icon alignment
+
 function Space({ children }: { children: React.ReactNode }) {
     return <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>{children}</span>;
 }
