@@ -10,7 +10,8 @@ A next-generation logistics platform designed for reliability, speed, and user e
 [Upload your walkthrough video here]
 
 ### **Architecture Diagrams**
-[Upload your HLD/LLD diagrams here]
+<img width="838" height="325" alt="Architecture diagram" src="https://github.com/user-attachments/assets/3d7be443-1a2a-4320-8500-69b8cefeef47" />
+
 
 ---
 
