@@ -7,9 +7,15 @@ A next-generation logistics platform designed for reliability, speed, and user e
 ## 🎥 Demo
 
 ### **Walkthrough Video**
-[Upload your walkthrough video here]
+![Walkthrough 1/2 ](https://github.com/user-attachments/assets/6a35ba62-03ab-490a-aaf8-1f70b3c38fa9)
 
-### **Architecture Diagrams**
+*1.Booking and Authentication Logic Flow*
+
+![Walkthrough 2/2](https://github.com/user-attachments/assets/5325230f-2c0d-4aac-9d49-3bd62de01c15)
+
+*2.Tracking Package Logic Flow*
+
+### **Architecture Diagram**
 <img width="838" height="325" alt="Architecture diagram" src="https://github.com/user-attachments/assets/3d7be443-1a2a-4320-8500-69b8cefeef47" />
 
 
